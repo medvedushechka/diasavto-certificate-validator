@@ -1,6 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 
-:root{font-family:Manrope,Arial,sans-serif;color:#17242c;background:#f6f8f9;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
+:root{font-family:Arial,Helvetica,sans-serif;color:#17242c;background:#f6f8f9;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}
 body{margin:0;min-width:320px}
 button,input{font:inherit}
@@ -52,25 +51,10 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .rule-example span{font-size:10px;letter-spacing:1px;font-weight:800;color:#8a979f}
 .rule-example code{font-size:16px;font-weight:800;color:#283842}
 .small-note{font-size:12px!important;line-height:1.8!important;margin:16px 0 0}
-.format-card>p{margin-top:18px}
-.fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:17px}
-.fields code{background:#f0f4f6;color:#34464e;border-radius:5px;padding:7px 9px;font-size:11px}
 .footer{color:#9aa5ac;font-size:12px;margin-top:27px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:900px){.workspace{grid-template-columns:1fr}.details{grid-template-columns:1fr 1fr}.main{padding-top:46px}}
 @media(max-width:640px){.topbar{padding:0 17px;height:72px}.brand-product,.brand-divider,.environment{display:none}.main{padding:43px 17px}.intro{margin-bottom:28px;font-size:14px}.panel{padding:20px}.details{grid-template-columns:1fr}.limit{font-size:11px}.detail-card{padding:23px}h1{letter-spacing:-1.5px}}
-
-.login-panel{max-width:470px;background:#fff;border:1px solid #e5ebef;border-radius:18px;padding:32px;display:grid;gap:16px}
-.login-panel p{font-size:13px;color:#64737d;margin:0}
-.login-panel input{width:100%;border:1px solid #ccd7dc;border-radius:8px;padding:13px 14px;background:#fff;color:#17242c}
-.login-panel input:focus-visible{outline:2px solid #d64141;outline-offset:2px}
-.session-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;color:#64737d;font-size:13px}
-.session-bar button{border:1px solid #dbe3e8;background:#fff;border-radius:8px;padding:8px 14px;color:#34444e}
-
-.certificate-upload{background:#f8fafb;border:1px solid #e5ebef;border-radius:10px;padding:16px;margin-bottom:18px;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
-.certificate-upload strong{width:100%;font-size:14px}
-.certificate-upload p{width:100%;font-size:12px;line-height:1.6;color:#73818c;margin:0}
-.certificate-upload button{max-width:100%;overflow-wrap:anywhere}
 
 .results-panel{margin-top:22px;background:#fff;border:1px solid #e5ebef;border-radius:18px;padding:30px}
 .results-panel h2{margin:0 0 22px}
@@ -78,17 +62,6 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .result-stats>div{background:#f6f8f9;border-radius:10px;padding:17px;display:flex;flex-direction:column;gap:10px}
 .result-stats span{color:#71808b;font-size:12px}
 .result-stats strong{font-size:29px;font-weight:800}
-.results-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
-.results-toolbar label{display:flex;flex-direction:column;gap:8px;font-size:12px;color:#52636d;font-weight:700}
-.results-toolbar select,.results-toolbar input{width:100%;min-width:0;border:1px solid #d7e1e6;border-radius:8px;background:#fff;padding:11px 12px;color:#17242c}
-.results-count{font-size:12px;color:#75848d;margin:18px 0 10px}
-.results-table-wrap{overflow-x:auto}
-.results-table{width:100%;border-collapse:collapse;text-align:left;font-size:12px}
-.results-table th,.results-table td{border-bottom:1px solid #e9eff2;padding:13px 10px;vertical-align:top;overflow-wrap:anywhere}
-.results-table th{background:#f6f8f9;color:#61737d;font-weight:800}
-.results-table td:first-child{font-family:monospace;font-weight:700}
-@media(max-width:640px){.results-panel{padding:18px}.results-toolbar{grid-template-columns:1fr}.result-stats{gap:6px}.result-stats>div{padding:11px}.result-stats strong{font-size:22px}.result-stats span{font-size:10px}.results-table{min-width:600px}}
-
 .upload-glyph{font-size:35px;font-weight:700;line-height:1}
 .mask-list{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}
 .mask-list code{padding:10px 13px;border:1px solid #e0e7eb;border-radius:7px;background:#f6f8f9;color:#253941;font-size:14px;font-weight:800}
