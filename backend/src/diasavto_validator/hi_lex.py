@@ -38,5 +38,16 @@ def validate_item(item: CatalogItem) -> ValidationResult:
     return ValidationResult(item, key, prefix + "****", None)
 
 
-def validate_catalog(items: list[CatalogItem]) -> list[ValidationResult]:
-    return [validate_item(item) for item in items]
+def validate_catalog(
+    items: list[CatalogItem], allowed_masks: tuple[str, ...] | None = None
+) -> list[ValidationResult]:
+    if allowed_masks is None:
+        return [validate_item(item) for item in items]
+    allowed = frozenset(allowed_masks)
+    results = []
+    for item in items:
+        result = validate_item(item)
+        if result.is_accepted and result.matched_mask not in allowed:
+            result = ValidationResult(item, result.search_key, None, RejectionReason.MASK_MISMATCH)
+        results.append(result)
+    return results
