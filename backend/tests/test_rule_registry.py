@@ -37,7 +37,7 @@ def test_unknown_supplier_is_rejected() -> None:
         supplier_rules("unknown")
 
 
-def test_api_checks_supplier_rules() -> None:
+def test_api_checks_masks_from_certificate() -> None:
     from fastapi.testclient import TestClient
 
     from app import app
@@ -46,23 +46,40 @@ def test_api_checks_supplier_rules() -> None:
     app.dependency_overrides[require_user] = lambda: "test-user"
     try:
         client = TestClient(app)
-        response = client.post(
+
+        def check(article: str, certificate: bytes):
+            return client.post(
+                "/api/rules/check",
+                data={"article": article},
+                files={"certificate": ("rules.txt", certificate, "text/plain")},
+            )
+
+        assert check("4VB12A9", b"4VB****").json()["matches"] is True
+        assert check("9BB1234", b"4VB****").json()["matches"] is False
+        assert check("9BB1234", b"9BB****").json()["matches"] is True
+        assert check("4VB1234", b"4QB****").status_code == 422
+        assert client.post(
             "/api/rules/check",
-            json={"supplier": "hi-lex", "article": "4VB12A9", "masks": ["4VB****"]},
+            json={"article": "4VB12A9", "masks": ["4VB****"]},
+        ).status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_certificate_recognition_deduplicates_and_sorts() -> None:
+    from fastapi.testclient import TestClient
+
+    from app import app
+    from auth import require_user
+
+    app.dependency_overrides[require_user] = lambda: "test-user"
+    try:
+        response = TestClient(app).post(
+            "/api/generation/plan",
+            files={"certificate": ("rules.txt", b"9BB**** 4VB**** 9BB****", "text/plain")},
         )
         assert response.status_code == 200
-        assert response.json()["matches"] is True
-        response = client.post(
-            "/api/rules/check",
-            json={"supplier": "hi-lex", "article": "9BB1234", "masks": ["4VB****"]},
-        )
-        assert response.status_code == 200
-        assert response.json()["matches"] is False
-        response = client.post(
-            "/api/rules/check",
-            json={"supplier": "hi-lex", "article": "4VB1234", "masks": ["4QB****"]},
-        )
-        assert response.status_code == 422
+        assert response.json() == {"masks": ["4VB****", "9BB****"], "mask_count": 2}
     finally:
         app.dependency_overrides.clear()
 
