@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
-import type { Session } from "@supabase/supabase-js";
-import { supabase } from "./auth";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 type Plan = { masks: string[]; mask_count: number };
 
@@ -23,11 +21,6 @@ function validateCertificate(file: File): string | null {
 
 export default function App() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [authBusy, setAuthBusy] = useState(false);
-  const [authError, setAuthError] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,23 +35,8 @@ export default function App() {
   const [checkError, setCheckError] = useState("");
 
   useEffect(() => {
-    void supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next);
-      if (!next) { setFile(null); setPlan(null); setArticle(""); }
-    });
-    return () => data.subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!session) {
-      setApprovedMasks([]);
-      setRulesError("");
-      return;
-    }
     const controller = new AbortController();
     void fetch(`${apiBase}/api/rules/hi-lex`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
       signal: controller.signal,
       cache: "no-store",
     }).then(async (response) => {
@@ -72,16 +50,7 @@ export default function App() {
       if (!controller.signal.aborted) setRulesError(cause instanceof Error ? cause.message : "Ошибка загрузки масок.");
     });
     return () => controller.abort();
-  }, [session]);
-
-  async function signIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthBusy(true);
-    setAuthError("");
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) setAuthError("Не удалось войти. Проверьте учётные данные.");
-    setAuthBusy(false);
-  }
+  }, []);
 
   function chooseFile(candidate?: File) {
     if (!candidate) return;
@@ -104,13 +73,13 @@ export default function App() {
   }
 
   async function recognize() {
-    if (!session || !file || busy) return;
+    if (!file || busy) return;
     setBusy(true); setError(""); setPlan(null);
     const body = new FormData();
     body.append("certificate", file);
     try {
       const response = await fetch(`${apiBase}/api/generation/plan`, {
-        method: "POST", headers: { Authorization: `Bearer ${session.access_token}` },
+        method: "POST",
         cache: "no-store", body,
       });
       if (!response.ok) {
@@ -134,7 +103,7 @@ export default function App() {
   }
 
   async function checkArticle() {
-    if (!plan || !session || !file || !article.trim() || checkBusy) return;
+    if (!plan || !file || !article.trim() || checkBusy) return;
     setCheckBusy(true);
     setCheckError("");
     setCheckResult(null);
@@ -144,7 +113,6 @@ export default function App() {
       body.append("certificate", file);
       const response = await fetch(`${apiBase}/api/rules/check`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
         cache: "no-store",
         body,
       });
@@ -180,14 +148,7 @@ export default function App() {
       <div className="eyebrow"><span className="eyebrow-dot" /> ИНСТРУМЕНТ ПРОВЕРКИ</div>
       <h1>Проверка артикулов<br />по маскам сертификата</h1>
       <p className="intro">Загрузите сертификат. Система распознает маски HI-LEX и позволит проверить, покрывается ли конкретный артикул сертификатом. Каталог товаров не требуется.</p>
-      {!session ? <form className="login-panel" onSubmit={signIn}>
-        <h2>Вход в систему</h2><p>Для работы необходима учётная запись.</p>
-        <input aria-label="Электронная почта" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Электронная почта" />
-        <input aria-label="Пароль" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль" />
-        <button className="primary-button" type="submit" disabled={authBusy}>{authBusy ? "Входим…" : "Войти"}</button>
-        {authError && <p className="feedback feedback-error" role="alert">{authError}</p>}
-      </form> : <>
-        <div className="session-bar"><span>Вы вошли в систему</span><button type="button" onClick={() => void supabase.auth.signOut()}>Выйти</button></div>
+      <>
         <div className="workspace">
           <section className="panel" aria-labelledby="upload-heading">
             <div className="panel-heading"><div><span className="step">01 / СЕРТИФИКАТ</span>
