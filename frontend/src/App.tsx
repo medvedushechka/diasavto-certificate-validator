@@ -150,7 +150,7 @@ export default function App() {
       <p className="intro">Загрузите сертификат. Система распознает маски HI-LEX и позволит проверить, покрывается ли конкретный артикул сертификатом. Каталог товаров не требуется.</p>
         <div className="workspace">
           <section className="panel" aria-labelledby="upload-heading">
-            <div className="panel-heading"><div><span className="step">01 / СЕРТИФИКАТ</span>
+            <div className="panel-heading"><div>
               <h2 id="upload-heading">Загрузка сертификата</h2></div><span className="tag">PDF, DOCX, TXT</span>
             </div>
             <div className={`dropzone${dragging ? " dragging" : ""}`}
@@ -169,7 +169,7 @@ export default function App() {
             {error && <p className="feedback feedback-error" role="alert">{error}</p>}
           </section>
           <aside className="details">
-            <section className="detail-card"><span className="step">02 / ПРАВИЛА</span><h2>HI-LEX CORPORATION</h2>
+            <section className="detail-card"><h2>HI-LEX CORPORATION</h2>
               <p>Тросы стояночного тормоза</p>
               <div className="allowed-masks-wrap"
                 onMouseEnter={() => setShowAllowedMasks(true)}
@@ -195,7 +195,7 @@ export default function App() {
           </aside>
         </div>
         {plan && <section className="results-panel" aria-label="Результаты распознавания">
-          <span className="step">03 / РЕЗУЛЬТАТ</span><h2>Маски сертификата</h2>
+          <h2>Маски сертификата</h2>
           <div className="result-stats">
             <div><span>Найдено масок</span><strong>{plan.mask_count}</strong></div>
             <div><span>Производитель</span><strong className="result-brand">HI-LEX</strong></div>
