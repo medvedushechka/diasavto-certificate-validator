@@ -76,3 +76,23 @@ def test_rejects_formula_injection_on_export() -> None:
     assert response.status_code == 200
     sheet = load_workbook(io.BytesIO(response.content)).worksheets[1]
     assert sheet["A2"].data_type == "s"
+
+
+def test_preview_counts_and_reasons() -> None:
+    payload = (
+        "article,manufacturer,product_group\n"
+        "4VB0000,HI-LEX CORPORATION,тросы стояночного тормоза\n"
+        "4QB1234,HI-LEX CORPORATION,тросы стояночного тормоза\n"
+        "4VB12-3,HI-LEX CORPORATION,тросы стояночного тормоза\n"
+    )
+    response = client.post(
+        "/api/preview",
+        files={"file": ("catalog.csv", payload.encode(), "text/csv")},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert (result["total"], result["accepted"], result["rejected"]) == (3, 1, 2)
+    assert {item["reason"] for item in result["exceptions"]} == {
+        "invalid_article", "mask_mismatch"
+    }
+    assert response.headers["cache-control"] == "no-store"
