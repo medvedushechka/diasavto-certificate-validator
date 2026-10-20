@@ -1,8 +1,6 @@
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from auth import require_user
 from diasavto_validator.certificates import (
     MAX_CERTIFICATE_BYTES,
     CertificateFormatError,
@@ -16,14 +14,6 @@ from diasavto_validator.pdf_certificates import (
 from diasavto_validator.rule_registry import supplier_rules
 
 app = FastAPI(title="DiasAvto Certificate Validator", docs_url=None, redoc_url=None)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://medvedushechka.github.io"],
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Authorization", "Content-Type"],
-)
-
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
@@ -31,7 +21,7 @@ def health() -> dict[str, str]:
 
 
 @app.get("/api/rules/hi-lex")
-def approved_hi_lex_masks(user_id: str = Depends(require_user)) -> JSONResponse:
+def approved_hi_lex_masks() -> JSONResponse:
     rules = supplier_rules("hi-lex")
     return JSONResponse(
         {
@@ -62,7 +52,7 @@ async def _certificate_masks(certificate: UploadFile) -> tuple[str, ...]:
 @app.post("/api/generation/plan")
 async def generation_plan(
     certificate: UploadFile = File(...),
-    user_id: str = Depends(require_user),
+    ,
 ) -> JSONResponse:
     """Извлечь разрешённые маски сертификата без генерации артикулов."""
     masks = await _certificate_masks(certificate)
@@ -76,7 +66,7 @@ async def generation_plan(
 async def check_article(
     article: str = Form(min_length=1, max_length=128),
     certificate: UploadFile = File(...),
-    user_id: str = Depends(require_user),
+    ,
 ) -> JSONResponse:
     # Маски определяются сервером из сертификата, а не передаются клиентом.
     masks = await _certificate_masks(certificate)
