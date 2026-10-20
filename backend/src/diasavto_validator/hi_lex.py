@@ -7,6 +7,8 @@ PREFIXES = (
     "9YB", "2KB", "9GB", "2YB", "7HB", "9BB",
 )
 PREFIX_SET = frozenset(PREFIXES)
+
+
 def search_key(article: str) -> str:
     # Сохраняем внутренние пробелы и символы для корректного учёта исключений.
     return article.replace("\u00a0", " ").strip(" ").translate(
