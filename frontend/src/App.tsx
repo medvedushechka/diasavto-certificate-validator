@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./auth";
 
@@ -41,7 +41,7 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  async function signIn(event: React.FormEvent<HTMLFormElement>) {
+  async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthBusy(true);
     setAuthError("");
