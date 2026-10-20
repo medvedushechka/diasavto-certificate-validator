@@ -252,7 +252,7 @@ export default function App() {
             {checkResult !== null && <p role="status" className={`feedback ${checkResult ? "feedback-success" : "feedback-error"}`}>
               {checkResult ? "Соответствует маске сертификата." : "Не соответствует маскам сертификата или формату артикула."}
             </p>}
-            {checkError && <p role="alert" className="feedback feedback-error">{checkError}</p>
+            {checkError && <p role="alert" className="feedback feedback-error">{checkError}</p>}
           </div>
         </section>}
       </>}
