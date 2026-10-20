@@ -148,7 +148,6 @@ export default function App() {
       <div className="eyebrow"><span className="eyebrow-dot" /> ИНСТРУМЕНТ ПРОВЕРКИ</div>
       <h1>Проверка артикулов<br />по маскам сертификата</h1>
       <p className="intro">Загрузите сертификат. Система распознает маски HI-LEX и позволит проверить, покрывается ли конкретный артикул сертификатом. Каталог товаров не требуется.</p>
-      <>
         <div className="workspace">
           <section className="panel" aria-labelledby="upload-heading">
             <div className="panel-heading"><div><span className="step">01 / СЕРТИФИКАТ</span>
@@ -217,7 +216,6 @@ export default function App() {
             {checkError && <p role="alert" className="feedback feedback-error">{checkError}</p>}
           </div>
         </section>}
-      </>}
       <footer className="footer">Соответствие маске не подтверждает существование артикула в каталоге производителя.</footer>
     </main>
   </div>;
