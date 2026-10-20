@@ -88,3 +88,11 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .results-table th{background:#f6f8f9;color:#61737d;font-weight:800}
 .results-table td:first-child{font-family:monospace;font-weight:700}
 @media(max-width:640px){.results-panel{padding:18px}.results-toolbar{grid-template-columns:1fr}.result-stats{gap:6px}.result-stats>div{padding:11px}.result-stats strong{font-size:22px}.result-stats span{font-size:10px}.results-table{min-width:600px}}
+
+.upload-glyph{font-size:35px;font-weight:700;line-height:1}
+.mask-list{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}
+.mask-list code{padding:10px 13px;border:1px solid #e0e7eb;border-radius:7px;background:#f6f8f9;color:#253941;font-size:14px;font-weight:800}
+.result-stats .result-brand{font-size:16px;overflow-wrap:anywhere}
+.article-check{border-top:1px solid #edf1f3;margin-top:25px;padding-top:24px}
+.article-check input{margin-top:16px;width:100%;max-width:380px;padding:13px 15px;background:#fff;border:1px solid #cbd6dc;border-radius:8px}
+.article-check .feedback{max-width:540px}
