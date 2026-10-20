@@ -4,8 +4,8 @@
 Новые варианты масок не выводятся автоматически из текста или ответов LLM.
 """
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from .hi_lex import PREFIXES, search_key
 
