@@ -82,3 +82,11 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .allowed-masks-popover>strong{display:block;font-size:13px;margin-bottom:12px}
 .allowed-masks-items{display:flex;flex-wrap:wrap;gap:7px}
 .allowed-masks-items code{font-size:12px;padding:6px 8px;border-radius:5px;background:#f3f6f8;color:#34444e;white-space:nowrap}
+
+.feedback-warning{background:#fff8e8;color:#875b14}
+.unapproved-group{margin-top:25px;padding:18px 20px;background:#fff8f6;border:1px solid #f1ded9;border-radius:10px}
+.unapproved-group h3,.approved-heading{font-size:16px;margin:0 0 9px}
+.unapproved-group .small-note{margin-top:0}
+.mask-list-unapproved{margin-bottom:0}
+.mask-list-unapproved code{background:#fff0ee;border-color:#edc8c4;color:#9d3530}
+.approved-heading{margin-top:26px}
