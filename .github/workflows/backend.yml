@@ -25,6 +25,8 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: python -m pip install -e './backend[dev]'
+      - name: Verify Python syntax
+        run: python -m compileall -q backend
       - name: Lint
         run: ruff check backend
       - name: Test
