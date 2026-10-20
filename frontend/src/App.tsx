@@ -8,7 +8,7 @@ function sortedMasks(masks: string[]): string[] {
     return prefixOrder || a.localeCompare(b, "en");
   });
 }
-const apiBase = import.meta.env.VITE_API_BASE_URL || "";
+const apiBase = "";
 const maxSize = 2 * 1024 * 1024;
 
 function validateCertificate(file: File): string | null {
