@@ -2,7 +2,7 @@ import io
 
 import pytest
 from fastapi.testclient import TestClient
-from docx import Document
+from zipfile import ZIP_DEFLATED, ZipFile
 from openpyxl import load_workbook
 
 from app import app
@@ -30,10 +30,14 @@ def test_rejects_missing_masks() -> None:
 
 
 def test_extracts_docx_masks() -> None:
-    document = Document()
-    document.add_paragraph("Тросы стояночного тормоза 4VB****, 9BB****")
     buffer = io.BytesIO()
-    document.save(buffer)
+    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "word/document.xml",
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:p><w:r><w:t>4VB**** 9BB****</w:t></w:r></w:p></w:body>"
+            "</w:document>",
+        )
     assert extract_masks(buffer.getvalue(), "mask.docx") == ("4VB****", "9BB****")
 
 
