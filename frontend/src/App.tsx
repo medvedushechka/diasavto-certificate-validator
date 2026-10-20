@@ -190,7 +190,7 @@ export default function App() {
                   aria-controls="approved-hi-lex-masks"
                   onClick={() => setShowAllowedMasks((open) => !open)}>
                   <strong>{approvedMasks.length || "—"}</strong>
-                  <span>утверждённых<br />масок<br /><small>Наведите или нажмите</small></span>
+                  <span>масок в справочнике<br />HI-LEX<br /><small>Наведите или нажмите</small></span>
                 </button>
                 {showAllowedMasks && (
                   <div id="approved-hi-lex-masks" className="allowed-masks-popover">
