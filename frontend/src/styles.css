@@ -98,5 +98,5 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .article-check .feedback{max-width:540px}
 
 .mask-sort-note{font-size:12px;color:#788994;margin:18px 0 -5px}
-.mask-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
-.mask-list code{display:block;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.4px;white-space:nowrap}
+.mask-list{display:flex;flex-wrap:wrap;gap:9px}
+.mask-list code{display:inline-block;font-variant-numeric:tabular-nums;letter-spacing:.4px;white-space:nowrap}
