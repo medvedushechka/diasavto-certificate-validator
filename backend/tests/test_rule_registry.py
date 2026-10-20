@@ -46,9 +46,9 @@ def test_api_checks_masks_from_certificate() -> None:
 
     def check(article: str, certificate: bytes):
         return client.post(
-                "/api/rules/check",
-                data={"article": article},
-                files={"certificate": ("rules.txt", certificate, "text/plain")},
+            "/api/rules/check",
+            data={"article": article},
+            files={"certificate": ("rules.txt", certificate, "text/plain")},
         )
 
     assert check("4VB12A9", b"4VB****").json()["matches"] is True
@@ -57,41 +57,31 @@ def test_api_checks_masks_from_certificate() -> None:
     assert check("4VB1234", b"4QB****").status_code == 422
     assert client.post(
         "/api/rules/check",
-            json={"article": "4VB12A9", "masks": ["4VB****"]},
-        ).status_code == 422
+        json={"article": "4VB12A9", "masks": ["4VB****"]},
+    ).status_code == 422
 
 
 def test_certificate_recognition_deduplicates_and_sorts() -> None:
     from fastapi.testclient import TestClient
 
     from app import app
-    from auth import require_user
 
-    app.dependency_overrides[require_user] = lambda: "test-user"
-    try:
     response = TestClient(app).post(
-            "/api/generation/plan",
+        "/api/generation/plan",
         files={"certificate": ("rules.txt", b"9BB**** 4VB**** 9BB****", "text/plain")},
-        )
+    )
     assert response.status_code == 200
     assert response.json() == {"masks": ["4VB****", "9BB****"], "mask_count": 2}
-    finally:
-        app.dependency_overrides.clear()
 
 
 def test_approved_masks_endpoint_uses_registry() -> None:
     from fastapi.testclient import TestClient
 
     from app import app
-    from auth import require_user
 
-    app.dependency_overrides[require_user] = lambda: "test-user"
-    try:
     response = TestClient(app).get("/api/rules/hi-lex")
     assert response.status_code == 200
     data = response.json()
     assert data["count"] == len(HI_LEX.masks) == 38
     assert data["masks"] == sorted(HI_LEX.masks)
     assert response.headers["cache-control"] == "no-store"
-    finally:
-        app.dependency_overrides.clear()
