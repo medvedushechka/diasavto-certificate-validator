@@ -5,6 +5,7 @@ from openpyxl import Workbook
 
 from diasavto_validator.catalog_io import CatalogFormatError, parse_catalog
 
+
 def test_csv_parses_and_preserves_raw_article() -> None:
     payload = (
         "article,manufacturer,product_group\n"
