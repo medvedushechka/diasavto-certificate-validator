@@ -7,7 +7,11 @@ from diasavto_validator.certificates import (
     CertificateFormatError,
     extract_masks,
 )
-from diasavto_validator.pdf_certificates import MAX_PDF_BYTES, PdfCertificateError, extract_pdf_masks
+from diasavto_validator.pdf_certificates import (
+    MAX_PDF_BYTES,
+    PdfCertificateError,
+    extract_pdf_masks,
+)
 from diasavto_validator.rule_registry import supplier_rules
 
 app = FastAPI(title="DiasAvto Certificate Validator", docs_url=None, redoc_url=None)
