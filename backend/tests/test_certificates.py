@@ -1,8 +1,8 @@
 import io
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 from fastapi.testclient import TestClient
-from zipfile import ZIP_DEFLATED, ZipFile
 from openpyxl import load_workbook
 
 from app import app
