@@ -50,6 +50,8 @@ export default function App() {
     setAuthBusy(false);
   }
   const [file, setFile] = useState<File | null>(null);
+  const [certificate, setCertificate] = useState<File | null>(null);
+  const certificateInputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<RequestState>("idle");
   const [message, setMessage] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -79,6 +81,7 @@ export default function App() {
     setMessage("");
     const form = new FormData();
     form.append("file", file);
+    if (certificate) form.append("certificate", certificate);
     try {
       const response = await fetch("/api/validate", {
         method: "POST",
@@ -155,6 +158,29 @@ export default function App() {
                 <h2 id="upload-heading">Каталог товаров</h2>
               </div>
               <span className="tag">CSV, XLSX</span>
+            </div>
+            <div className="certificate-upload">
+              <strong>Сертификат с масками</strong>
+              <p>Необязательно. DOCX или TXT, максимум 1 МБ. Без сертификата используются все 38 утверждённых масок.</p>
+              <input ref={certificateInputRef} className="sr-only" type="file" accept=".docx,.txt" aria-label="Выбрать сертификат" onChange={(event) => {
+                const selected = event.target.files?.[0];
+                event.target.value = "";
+                if (!selected) return;
+                const ext = selected.name.split(".").pop()?.toLowerCase();
+                if (!["docx", "txt"].includes(ext || "") || selected.size === 0 || selected.size > 1024 * 1024) {
+                  setCertificate(null);
+                  setState("error");
+                  setMessage("Сертификат должен быть DOCX/TXT размером до 1 МБ.");
+                  return;
+                }
+                setCertificate(selected);
+                setState("idle");
+                setMessage("");
+              }} />
+              <button type="button" className="secondary-button" onClick={() => certificateInputRef.current?.click()}>
+                {certificate ? certificate.name : "Выбрать сертификат"}
+              </button>
+              {certificate && <button type="button" className="secondary-button" onClick={() => setCertificate(null)}>Убрать</button>}
             </div>
             <div
               className={`dropzone${dragging ? " dragging" : ""}`}
