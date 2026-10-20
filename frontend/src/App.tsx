@@ -1,4 +1,6 @@
-import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "./auth";
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = [".csv", ".xlsx"];
@@ -27,6 +29,26 @@ function FileIcon() {
 
 export default function App() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  async function signIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthBusy(true);
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setAuthError("Не удалось войти. Проверьте учётные данные.");
+    setAuthBusy(false);
+  }
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<RequestState>("idle");
   const [message, setMessage] = useState("");
@@ -52,7 +74,7 @@ export default function App() {
   }
 
   async function submit() {
-    if (!file || state === "loading") return;
+    if (!file || state === "loading" || !session) return;
     setState("loading");
     setMessage("");
     const form = new FormData();
@@ -60,6 +82,7 @@ export default function App() {
     try {
       const response = await fetch("/api/validate", {
         method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
         body: form,
         cache: "no-store",
       });
@@ -114,6 +137,16 @@ export default function App() {
         <h1>Проверка артикулов<br />по маскам сертификатов</h1>
         <p className="intro">Загрузите каталог производителя. Система проверит артикулы по утверждённым маскам HI-LEX и сформирует Excel-отчёт.</p>
 
+        {!session ? (
+          <form className="login-panel" onSubmit={signIn}>
+            <h2>Вход в систему</h2>
+            <p>Для проверки файлов необходима учётная запись.</p>
+            <input aria-label="Электронная почта" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Электронная почта" />
+            <input aria-label="Пароль" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль" />
+            <button className="primary-button" type="submit" disabled={authBusy}>{authBusy ? "Проверка…" : "Войти"}</button>
+            {authError && <p className="feedback feedback-error" role="alert">{authError}</p>}
+          </form>
+        ) : <><div className="session-bar"><span>Вы вошли в систему</span><button type="button" onClick={() => void supabase.auth.signOut()}>Выйти</button></div>
         <div className="workspace">
           <section className="panel" aria-labelledby="upload-heading">
             <div className="panel-heading">
@@ -176,6 +209,7 @@ export default function App() {
             </section>
           </aside>
         </div>
+        </>}
         <footer className="footer">Проверка формата не подтверждает наличие артикула в каталоге производителя.</footer>
       </main>
     </div>
