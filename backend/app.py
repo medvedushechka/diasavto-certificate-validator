@@ -1,6 +1,7 @@
 from io import BytesIO
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 
 from auth import require_user
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -13,6 +14,7 @@ from diasavto_validator.catalog_io import (
 )
 from diasavto_validator.hi_lex import validate_catalog
 from diasavto_validator.models import ValidationResult
+from diasavto_validator.rule_registry import supplier_rules
 from diasavto_validator.pdf_certificates import extract_pdf_masks, PdfCertificateError, MAX_PDF_BYTES
 from diasavto_validator.certificates import (
     MAX_CERTIFICATE_BYTES,
@@ -131,5 +133,27 @@ async def generation_plan(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return JSONResponse(
         {"masks": masks, "mask_count": len(masks)},
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+class ArticleCheckRequest(BaseModel):
+    supplier: str = "hi-lex"
+    article: str = Field(min_length=1, max_length=128)
+    masks: list[str] = Field(min_length=1, max_length=100)
+
+
+@app.post("/api/rules/check")
+def check_article(
+    request: ArticleCheckRequest,
+    user_id: str = Depends(require_user),
+) -> JSONResponse:
+    try:
+        rules = supplier_rules(request.supplier)
+        matched = rules.matches(request.article, tuple(request.masks))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return JSONResponse(
+        {"matches": matched, "supplier": rules.code, "rules_version": rules.version},
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
