@@ -10,6 +10,7 @@ function sortedMasks(masks: string[]): string[] {
     return prefixOrder || a.localeCompare(b, "en");
   });
 }
+const APPROVED_HI_LEX_MASKS = ["1PB****","2HB****","2JB****","2KB****","2PB****","2YB****","4AB****","4BB****","4CB****","4DB****","4FB****","4GB****","4HB****","4JB****","4MB****","4NB****","4PB****","4RB****","4TB****","4UB****","4VB****","4ZB****","5CB****","5PB****","7HB****","9AB****","9BB****","9CB****","9DB****","9GB****","9HB****","9JB****","9NB****","9RB****","9TB****","9VB****","9YB****","9ZB****"];
 const maxSize = 2 * 1024 * 1024;
 
 function validateCertificate(file: File): string | null {
@@ -33,6 +34,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [plan, setPlan] = useState<Plan | null>(null);
   const [article, setArticle] = useState("");
+  const [showAllowedMasks, setShowAllowedMasks] = useState(false);
   const [checkResult, setCheckResult] = useState<boolean | null>(null);
   const [checkBusy, setCheckBusy] = useState(false);
   const [checkError, setCheckError] = useState("");
@@ -183,7 +185,23 @@ export default function App() {
           <aside className="details">
             <section className="detail-card"><span className="step">02 / ПРАВИЛА</span><h2>HI-LEX CORPORATION</h2>
               <p>Тросы стояночного тормоза</p>
-              <div className="rule-number"><strong>38</strong><span>утверждённых<br />масок</span></div>
+              <div className="allowed-masks-wrap"
+                onMouseEnter={() => setShowAllowedMasks(true)}
+                onMouseLeave={() => setShowAllowedMasks(false)}>
+                <button type="button" className="rule-number rule-number-button"
+                  aria-expanded={showAllowedMasks}
+                  aria-controls="approved-hi-lex-masks"
+                  onClick={() => setShowAllowedMasks((open) => !open)}>
+                  <strong>{APPROVED_HI_LEX_MASKS.length}</strong>
+                  <span>утверждённых<br />масок<br /><small>Наведите или нажмите</small></span>
+                </button>
+                {showAllowedMasks && (
+                  <div id="approved-hi-lex-masks" className="allowed-masks-popover">
+                    <strong>Разрешённые маски HI-LEX</strong>
+                    <div className="allowed-masks-items">{APPROVED_HI_LEX_MASKS.map((mask) => <code key={mask}>{mask}</code>)}</div>
+                  </div>
+                )}
+              </div>
               <div className="rule-example"><span>ПРИМЕР</span><code>4VB****</code></div>
               <p className="small-note">После фиксированного префикса — четыре символа из A–Z и 0–9. OCR для PDF-сканов не требуется по ТЗ.</p>
             </section>
