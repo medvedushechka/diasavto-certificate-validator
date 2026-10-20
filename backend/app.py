@@ -1,6 +1,5 @@
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 
 from auth import require_user
 from diasavto_validator.certificates import (
@@ -33,12 +32,7 @@ def approved_hi_lex_masks(user_id: str = Depends(require_user)) -> JSONResponse:
     )
 
 
-@app.post("/api/generation/plan")
-async def generation_plan(
-    certificate: UploadFile = File(...),
-    user_id: str = Depends(require_user),
-) -> JSONResponse:
-    """Извлечь маски сертификата, не перечисляя возможные артикулы."""
+async def _certificate_masks(certificate: UploadFile) -> tuple[str, ...]:
     if not certificate.filename:
         raise HTTPException(status_code=400, detail="Не указано имя сертификата")
     suffix = certificate.filename.lower().rsplit(".", 1)[-1]
@@ -47,33 +41,35 @@ async def generation_plan(
     await certificate.close()
     try:
         if suffix == "pdf":
-            masks = extract_pdf_masks(payload)
-        else:
-            masks = extract_masks(payload, certificate.filename)
+            return extract_pdf_masks(payload)
+        return extract_masks(payload, certificate.filename)
     except (PdfCertificateError, CertificateFormatError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/generation/plan")
+async def generation_plan(
+    certificate: UploadFile = File(...),
+    user_id: str = Depends(require_user),
+) -> JSONResponse:
+    """Извлечь разрешённые маски сертификата без генерации артикулов."""
+    masks = await _certificate_masks(certificate)
     return JSONResponse(
         {"masks": masks, "mask_count": len(masks)},
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
 
 
-class ArticleCheckRequest(BaseModel):
-    supplier: str = "hi-lex"
-    article: str = Field(min_length=1, max_length=128)
-    masks: list[str] = Field(min_length=1, max_length=100)
-
-
 @app.post("/api/rules/check")
-def check_article(
-    request: ArticleCheckRequest,
+async def check_article(
+    article: str = Form(min_length=1, max_length=128),
+    certificate: UploadFile = File(...),
     user_id: str = Depends(require_user),
 ) -> JSONResponse:
-    try:
-        rules = supplier_rules(request.supplier)
-        matched = rules.matches(request.article, tuple(request.masks))
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Маски определяются сервером из сертификата, а не передаются клиентом.
+    masks = await _certificate_masks(certificate)
+    rules = supplier_rules("hi-lex")
+    matched = rules.matches(article, masks)
     return JSONResponse(
         {"matches": matched, "supplier": rules.code, "rules_version": rules.version},
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
