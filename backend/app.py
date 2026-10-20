@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from auth import require_user
@@ -15,6 +16,13 @@ from diasavto_validator.pdf_certificates import (
 from diasavto_validator.rule_registry import supplier_rules
 
 app = FastAPI(title="DiasAvto Certificate Validator", docs_url=None, redoc_url=None)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://medvedushechka.github.io"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 @app.get("/api/health")
