@@ -65,3 +65,21 @@ def test_api_checks_supplier_rules() -> None:
         assert response.status_code == 422
     finally:
         app.dependency_overrides.clear()
+
+
+def test_approved_masks_endpoint_uses_registry() -> None:
+    from fastapi.testclient import TestClient
+
+    from app import app
+    from auth import require_user
+
+    app.dependency_overrides[require_user] = lambda: "test-user"
+    try:
+        response = TestClient(app).get("/api/rules/hi-lex")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == len(HI_LEX.masks) == 38
+        assert data["masks"] == sorted(HI_LEX.masks)
+        assert response.headers["cache-control"] == "no-store"
+    finally:
+        app.dependency_overrides.clear()
