@@ -10,7 +10,6 @@ function sortedMasks(masks: string[]): string[] {
     return prefixOrder || a.localeCompare(b, "en");
   });
 }
-const APPROVED_HI_LEX_MASKS = ["1PB****","2HB****","2JB****","2KB****","2PB****","2YB****","4AB****","4BB****","4CB****","4DB****","4FB****","4GB****","4HB****","4JB****","4MB****","4NB****","4PB****","4RB****","4TB****","4UB****","4VB****","4ZB****","5CB****","5PB****","7HB****","9AB****","9BB****","9CB****","9DB****","9GB****","9HB****","9JB****","9NB****","9RB****","9TB****","9VB****","9YB****","9ZB****"];
 const maxSize = 2 * 1024 * 1024;
 
 function validateCertificate(file: File): string | null {
@@ -35,6 +34,8 @@ export default function App() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [article, setArticle] = useState("");
   const [showAllowedMasks, setShowAllowedMasks] = useState(false);
+  const [approvedMasks, setApprovedMasks] = useState<string[]>([]);
+  const [rulesError, setRulesError] = useState("");
   const [checkResult, setCheckResult] = useState<boolean | null>(null);
   const [checkBusy, setCheckBusy] = useState(false);
   const [checkError, setCheckError] = useState("");
@@ -47,6 +48,30 @@ export default function App() {
     });
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setApprovedMasks([]);
+      setRulesError("");
+      return;
+    }
+    const controller = new AbortController();
+    void fetch("/api/rules/hi-lex", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      signal: controller.signal,
+      cache: "no-store",
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Не удалось загрузить разрешённые маски.");
+      const data: { masks: string[]; count: number } = await response.json();
+      if (!Array.isArray(data.masks) || data.count !== data.masks.length) {
+        throw new Error("Некорректный список масок.");
+      }
+      setApprovedMasks(sortedMasks(data.masks));
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted) setRulesError(cause instanceof Error ? cause.message : "Ошибка загрузки масок.");
+    });
+    return () => controller.abort();
+  }, [session]);
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -192,13 +217,14 @@ export default function App() {
                   aria-expanded={showAllowedMasks}
                   aria-controls="approved-hi-lex-masks"
                   onClick={() => setShowAllowedMasks((open) => !open)}>
-                  <strong>{APPROVED_HI_LEX_MASKS.length}</strong>
+                  <strong>{approvedMasks.length || "—"}</strong>
                   <span>утверждённых<br />масок<br /><small>Наведите или нажмите</small></span>
                 </button>
                 {showAllowedMasks && (
                   <div id="approved-hi-lex-masks" className="allowed-masks-popover">
                     <strong>Разрешённые маски HI-LEX</strong>
-                    <div className="allowed-masks-items">{APPROVED_HI_LEX_MASKS.map((mask) => <code key={mask}>{mask}</code>)}</div>
+                    {rulesError && <p role="alert">{rulesError}</p>}
+                    <div className="allowed-masks-items">{approvedMasks.map((mask) => <code key={mask}>{mask}</code>)}</div>
                   </div>
                 )}
               </div>
