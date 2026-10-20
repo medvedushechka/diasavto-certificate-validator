@@ -1,26 +1,25 @@
 from io import BytesIO
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from auth import require_user
-from fastapi.responses import StreamingResponse, JSONResponse
-
 from diasavto_validator.catalog_io import (
     MAX_UPLOAD_BYTES,
     CatalogFormatError,
     create_report,
     parse_catalog,
 )
-from diasavto_validator.hi_lex import validate_catalog
-from diasavto_validator.models import ValidationResult
-from diasavto_validator.rule_registry import supplier_rules
-from diasavto_validator.pdf_certificates import extract_pdf_masks, PdfCertificateError, MAX_PDF_BYTES
 from diasavto_validator.certificates import (
     MAX_CERTIFICATE_BYTES,
     CertificateFormatError,
     extract_masks,
 )
+from diasavto_validator.hi_lex import validate_catalog
+from diasavto_validator.models import ValidationResult
+from diasavto_validator.pdf_certificates import MAX_PDF_BYTES, PdfCertificateError, extract_pdf_masks
+from diasavto_validator.rule_registry import supplier_rules
 
 app = FastAPI(title="DiasAvto Certificate Validator", docs_url=None, redoc_url=None)
 
@@ -117,7 +116,7 @@ async def generation_plan(
     certificate: UploadFile = File(...),
     user_id: str = Depends(require_user),
 ) -> JSONResponse:
-    """Предварительный расчёт объёма выгрузки без генерации миллионов строк."""
+    """Извлечь маски сертификата, не перечисляя возможные артикулы."""
     if not certificate.filename:
         raise HTTPException(status_code=400, detail="Не указано имя сертификата")
     suffix = certificate.filename.lower().rsplit(".", 1)[-1]
