@@ -52,7 +52,6 @@ async def _certificate_masks(certificate: UploadFile) -> tuple[str, ...]:
 @app.post("/api/generation/plan")
 async def generation_plan(
     certificate: UploadFile = File(...),
-    ,
 ) -> JSONResponse:
     """Извлечь разрешённые маски сертификата без генерации артикулов."""
     masks = await _certificate_masks(certificate)
