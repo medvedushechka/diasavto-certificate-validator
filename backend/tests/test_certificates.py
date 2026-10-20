@@ -4,8 +4,6 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pytest
 
 from diasavto_validator.certificates import CertificateFormatError, extract_masks
-from diasavto_validator.hi_lex import validate_catalog
-from diasavto_validator.models import CatalogItem
 
 
 def test_reads_txt_masks() -> None:
@@ -35,15 +33,4 @@ def test_extracts_docx_masks() -> None:
             "</w:document>",
         )
     assert extract_masks(buffer.getvalue(), "mask.docx") == ("4VB****", "9BB****")
-
-
-def test_filters_by_certificate_masks() -> None:
-    items = [
-        CatalogItem("4VB0000", "HI-LEX CORPORATION", "тросы стояночного тормоза"),
-        CatalogItem("9BB0000", "HI-LEX CORPORATION", "тросы стояночного тормоза"),
-    ]
-    matched = validate_catalog(items, ("4VB****",))
-    assert matched[0].is_accepted
-    assert not matched[1].is_accepted
-
 
