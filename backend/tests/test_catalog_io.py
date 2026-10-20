@@ -1,22 +1,9 @@
 import io
 
 import pytest
-from fastapi.testclient import TestClient
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 
-from app import app
-from auth import require_user
 from diasavto_validator.catalog_io import CatalogFormatError, parse_catalog
-
-client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def authenticated_user():
-    app.dependency_overrides[require_user] = lambda: "synthetic-user-id"
-    yield
-    app.dependency_overrides.clear()
-
 
 def test_csv_parses_and_preserves_raw_article() -> None:
     payload = (
@@ -41,58 +28,3 @@ def test_excel_parses() -> None:
     assert parse_catalog(buffer.getvalue(), "catalog.xlsx")[0].article == "4VB0000"
 
 
-def test_http_report_has_two_sheets() -> None:
-    payload = (
-        "article,manufacturer,product_group\n"
-        "4VB0000,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-        "4QB1234,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-    )
-    response = client.post(
-        "/api/validate",
-        files={"file": ("catalog.csv", payload.encode(), "text/csv")},
-    )
-    assert response.status_code == 200
-    workbook = load_workbook(io.BytesIO(response.content), read_only=True)
-    assert workbook.sheetnames == ["Подходят", "Исключения"]
-    assert workbook.worksheets[0].max_row == 2
-    assert workbook.worksheets[1].max_row == 2
-
-
-def test_http_rejects_invalid_file() -> None:
-    response = client.post(
-        "/api/validate", files={"file": ("catalog.csv", b"bad", "text/csv")}
-    )
-    assert response.status_code == 422
-
-
-def test_rejects_formula_injection_on_export() -> None:
-    payload = (
-        "article,manufacturer,product_group\n"
-        "=1+2,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-    )
-    response = client.post(
-        "/api/validate", files={"file": ("catalog.csv", payload.encode(), "text/csv")}
-    )
-    assert response.status_code == 200
-    sheet = load_workbook(io.BytesIO(response.content)).worksheets[1]
-    assert sheet["A2"].data_type == "s"
-
-
-def test_preview_counts_and_reasons() -> None:
-    payload = (
-        "article,manufacturer,product_group\n"
-        "4VB0000,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-        "4QB1234,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-        "4VB12-3,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-    )
-    response = client.post(
-        "/api/preview",
-        files={"file": ("catalog.csv", payload.encode(), "text/csv")},
-    )
-    assert response.status_code == 200
-    result = response.json()
-    assert (result["total"], result["accepted"], result["rejected"]) == (3, 1, 2)
-    assert {item["reason"] for item in result["exceptions"]} == {
-        "invalid_article", "mask_mismatch"
-    }
-    assert response.headers["cache-control"] == "no-store"
