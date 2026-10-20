@@ -15,6 +15,7 @@ from diasavto_validator.rule_registry import supplier_rules
 
 app = FastAPI(title="DiasAvto Certificate Validator", docs_url=None, redoc_url=None)
 
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -65,7 +66,6 @@ async def generation_plan(
 async def check_article(
     article: str = Form(min_length=1, max_length=128),
     certificate: UploadFile = File(...),
-    ,
 ) -> JSONResponse:
     # Маски определяются сервером из сертификата, а не передаются клиентом.
     masks = await _certificate_masks(certificate)
