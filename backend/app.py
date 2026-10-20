@@ -6,12 +6,12 @@ from diasavto_validator.certificates import (
     CertificateFormatError,
     analyze_certificate,
 )
+from diasavto_validator.mask_report import MaskReport
 from diasavto_validator.pdf_certificates import (
     MAX_PDF_BYTES,
     PdfCertificateError,
     analyze_pdf_certificate,
 )
-from diasavto_validator.mask_report import MaskReport
 from diasavto_validator.rule_registry import supplier_rules
 
 app = FastAPI(title="DiasAvto Certificate Validator", docs_url=None, redoc_url=None)
