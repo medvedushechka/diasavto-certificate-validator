@@ -34,11 +34,10 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
-          GITHUB_PAGES: "true"
           VITE_API_BASE_URL: https://diasavto-validator-api.vercel.app
           VITE_SUPABASE_URL: https://scnmiwnagnqqhxzlvjan.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_fb-dtNPaI-HNh46KojQKOw_S9K0Y3Nk
-        run: npm run build
+        run: npm run build -- --mode pages
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
