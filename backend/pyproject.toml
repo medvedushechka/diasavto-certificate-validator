@@ -7,10 +7,14 @@ name = "diasavto-validator-core"
 version = "0.1.0"
 description = "Проверка артикулов по правилам сертификатов"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115,<1",
+    "python-multipart>=0.0.20,<1",
+    "openpyxl>=3.1,<4",
+]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1", "httpx>=0.27,<1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
