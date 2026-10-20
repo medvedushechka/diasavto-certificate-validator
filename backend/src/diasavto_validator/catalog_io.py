@@ -70,7 +70,14 @@ def parse_catalog(content: bytes, filename: str) -> list[CatalogItem]:
                 return _parse_rows(rows, headers)
             finally:
                 workbook.close()
-        except (\n            InvalidFileException, OSError, ValueError, KeyError, StopIteration, EOFError\n        ) as exc:
+        except (
+            InvalidFileException,
+            OSError,
+            ValueError,
+            KeyError,
+            StopIteration,
+            EOFError,
+        ) as exc:
             if isinstance(exc, CatalogFormatError):
                 raise
             raise CatalogFormatError("Повреждённый или пустой XLSX") from exc
