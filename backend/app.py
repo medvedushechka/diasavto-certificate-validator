@@ -3,7 +3,7 @@ from io import BytesIO
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 
 from auth import require_user
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 
 from diasavto_validator.catalog_io import (
     MAX_UPLOAD_BYTES,
@@ -12,6 +12,7 @@ from diasavto_validator.catalog_io import (
     parse_catalog,
 )
 from diasavto_validator.hi_lex import validate_catalog
+from diasavto_validator.models import ValidationResult
 from diasavto_validator.certificates import (
     MAX_CERTIFICATE_BYTES,
     CertificateFormatError,
@@ -26,12 +27,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/api/validate", response_class=StreamingResponse)
-async def validate(
+async def _process_upload(
     file: UploadFile = File(...),
     certificate: UploadFile | None = File(default=None),
     user_id: str = Depends(require_user),
-) -> StreamingResponse:
+) -> list[ValidationResult]:
     if not file.filename:
         raise HTTPException(status_code=400, detail="Не указано имя файла")
     if file.content_type not in (
@@ -56,7 +56,46 @@ async def validate(
             allowed_masks = extract_masks(certificate_content, certificate.filename or "")
         except CertificateFormatError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-    report = create_report(validate_catalog(catalog, allowed_masks))
+    return validate_catalog(catalog, allowed_masks)
+
+
+@app.post("/api/preview")
+async def preview(
+    file: UploadFile = File(...),
+    certificate: UploadFile | None = File(default=None),
+    user_id: str = Depends(require_user),
+) -> JSONResponse:
+    results = await _process_upload(file, certificate, user_id)
+    exceptions = [
+        {
+            "article": result.item.article,
+            "manufacturer": result.item.manufacturer,
+            "product_group": result.item.product_group,
+            "search_key": result.search_key,
+            "reason": result.rejection_reason.value,
+        }
+        for result in results
+        if result.rejection_reason is not None
+    ]
+    return JSONResponse(
+        {
+            "total": len(results),
+            "accepted": len(results) - len(exceptions),
+            "rejected": len(exceptions),
+            "exceptions": exceptions,
+        },
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.post("/api/validate", response_class=StreamingResponse)
+async def validate(
+    file: UploadFile = File(...),
+    certificate: UploadFile | None = File(default=None),
+    user_id: str = Depends(require_user),
+) -> StreamingResponse:
+    results = await _process_upload(file, certificate, user_id)
+    report = create_report(results)
     if len(report) > 4 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Отчёт слишком большой")
     return StreamingResponse(
