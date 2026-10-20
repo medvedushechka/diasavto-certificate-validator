@@ -1,14 +1,12 @@
 import io
-import re
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-from .hi_lex import PREFIX_SET
+from .mask_report import MaskReport, classify_masks
 
 MAX_CERTIFICATE_BYTES = 1024 * 1024
 MAX_UNCOMPRESSED_XML = 2 * 1024 * 1024
-MASK_PATTERN = re.compile(r"(?<![A-Za-z0-9*])([A-Z0-9]{3})\*{4}(?![A-Za-z0-9*])")
 DOCUMENT_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
@@ -16,7 +14,7 @@ class CertificateFormatError(ValueError):
     pass
 
 
-def extract_masks(content: bytes, filename: str) -> tuple[str, ...]:
+def analyze_certificate(content: bytes, filename: str) -> MaskReport:
     if not content or len(content) > MAX_CERTIFICATE_BYTES:
         raise CertificateFormatError("Сертификат пустой или превышает 1 МБ")
 
@@ -45,12 +43,16 @@ def extract_masks(content: bytes, filename: str) -> tuple[str, ...]:
     else:
         raise CertificateFormatError("Поддерживаются сертификаты DOCX и TXT")
 
-    found = {match.group(1) for match in MASK_PATTERN.finditer(text)}
-    if not found:
+    return classify_masks(text)
+
+
+def extract_masks(content: bytes, filename: str) -> tuple[str, ...]:
+    """Строгий режим для совместимости с существующими тестами."""
+    report = analyze_certificate(content, filename)
+    if not report.approved and not report.unapproved:
         raise CertificateFormatError("В документе не найдены маски формата ABC****")
-    unsupported = found - PREFIX_SET
-    if unsupported:
+    if report.unapproved:
         raise CertificateFormatError(
-            "Обнаружены неутверждённые маски: " + ", ".join(sorted(unsupported))
+            "Обнаружены неутверждённые маски: " + ", ".join(report.unapproved)
         )
-    return tuple(prefix + "****" for prefix in sorted(found))
+    return report.approved
