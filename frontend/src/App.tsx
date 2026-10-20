@@ -6,6 +6,21 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = [".csv", ".xlsx"];
 
 type RequestState = "idle" | "loading" | "success" | "error";
+type ExceptionRow = {
+  article: string;
+  manufacturer: string;
+  product_group: string;
+  search_key: string;
+  reason: string;
+};
+type Preview = { total: number; accepted: number; rejected: number; exceptions: ExceptionRow[] };
+const REASONS: Record<string, string> = {
+  invalid_article: "Неверный формат артикула",
+  mask_mismatch: "Не соответствует маскам сертификата",
+  manufacturer_mismatch: "Другой производитель",
+  product_group_mismatch: "Другая товарная группа",
+};
+
 
 function validateFile(file: File): string | null {
   const extension = "." + (file.name.split(".").pop()?.toLowerCase() ?? "");
@@ -55,11 +70,26 @@ export default function App() {
   const [state, setState] = useState<RequestState>("idle");
   const [message, setMessage] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const filtered = preview?.exceptions.filter((entry) => {
+    const matchesReason = filter === "all" || entry.reason === filter;
+    const term = query.trim().toLocaleLowerCase();
+    return matchesReason && (!term || [entry.article, entry.manufacturer, entry.product_group, entry.search_key]
+      .some((value) => value.toLocaleLowerCase().includes(term)));
+  }) ?? [];
+  function resetResults() {
+    setPreview(null);
+    setQuery("");
+    setFilter("all");
+  }
 
   function chooseFile(candidate?: File) {
     if (!candidate) return;
     const error = validateFile(candidate);
     setFile(error ? null : candidate);
+    resetResults();
     setState(error ? "error" : "idle");
     setMessage(error ?? "");
   }
@@ -79,10 +109,32 @@ export default function App() {
     if (!file || state === "loading" || !session) return;
     setState("loading");
     setMessage("");
+    resetResults();
     const form = new FormData();
     form.append("file", file);
     if (certificate) form.append("certificate", certificate);
     try {
+      const previewResponse = await fetch("/api/preview", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: form,
+        cache: "no-store",
+      });
+      if (!previewResponse.ok) {
+        let detail = "Не удалось проверить каталог.";
+        try {
+          const body: unknown = await previewResponse.json();
+          if (typeof body === "object" && body !== null && "detail" in body && typeof body.detail === "string") detail = body.detail;
+        } catch {
+          // Сервер может вернуть ошибку не в формате JSON.
+        }
+        throw new Error(detail);
+      }
+      const summary: Preview = await previewResponse.json();
+      if (!Array.isArray(summary.exceptions) || summary.rejected !== summary.exceptions.length) {
+        throw new Error("Сервер вернул некорректные результаты.");
+      }
+      setPreview(summary);
       const response = await fetch("/api/validate", {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -116,7 +168,7 @@ export default function App() {
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setState("success");
-      setMessage("Проверка завершена. Отчёт скачан на устройство.");
+      setMessage("Проверка завершена. Итоги доступны ниже, Excel-отчёт скачан.");
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "Ошибка соединения с сервером.");
@@ -174,13 +226,14 @@ export default function App() {
                   return;
                 }
                 setCertificate(selected);
+                resetResults();
                 setState("idle");
                 setMessage("");
               }} />
               <button type="button" className="secondary-button" onClick={() => certificateInputRef.current?.click()}>
                 {certificate ? certificate.name : "Выбрать сертификат"}
               </button>
-              {certificate && <button type="button" className="secondary-button" onClick={() => setCertificate(null)}>Убрать</button>}
+              {certificate && <button type="button" className="secondary-button" onClick={() => { setCertificate(null); resetResults(); setState("idle"); }}>Убрать</button>}
             </div>
             <div
               className={`dropzone${dragging ? " dragging" : ""}`}
@@ -235,6 +288,39 @@ export default function App() {
             </section>
           </aside>
         </div>
+        {preview && (
+          <section className="results-panel" aria-label="Результаты проверки">
+            <h2>Результаты проверки</h2>
+            <div className="result-stats">
+              <div><span>Всего проверено</span><strong>{preview.total}</strong></div>
+              <div><span>Подходят</span><strong>{preview.accepted}</strong></div>
+              <div><span>Исключения</span><strong>{preview.rejected}</strong></div>
+            </div>
+            <div className="results-toolbar">
+              <label>Причина исключения
+                <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+                  <option value="all">Все причины</option>
+                  {Object.entries(REASONS).map(([code, title]) => <option key={code} value={code}>{title}</option>)}
+                </select>
+              </label>
+              <label>Поиск по исключениям
+                <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Артикул, производитель..." />
+              </label>
+            </div>
+            <p className="results-count">Найдено исключений: {filtered.length} из {preview.rejected}</p>
+            <div className="results-table-wrap">
+              <table className="results-table">
+                <thead><tr><th>Артикул</th><th>Производитель</th><th>Товарная группа</th><th>Причина</th></tr></thead>
+                <tbody>
+                  {filtered.map((entry, i) => (
+                    <tr key={i}><td>{entry.article}</td><td>{entry.manufacturer}</td><td>{entry.product_group}</td><td>{REASONS[entry.reason] ?? entry.reason}</td></tr>
+                  ))}
+                  {filtered.length === 0 && <tr><td colSpan={4}>Исключений по выбранным условиям нет.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
         </>}
         <footer className="footer">Проверка формата не подтверждает наличие артикула в каталоге производителя.</footer>
       </main>
