@@ -99,6 +99,7 @@ export default function App() {
       if (!Array.isArray(result.masks) || result.mask_count !== result.masks.length ||
         result.masks.some((mask) => typeof mask !== "string")) throw new Error("Некорректный ответ сервера.");
       setPlan({ ...result, masks: sortedMasks(result.masks) });
+      setCheckResult(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка соединения.");
     } finally { setBusy(false); }
@@ -202,10 +203,12 @@ export default function App() {
           <div className="article-check">
             <h2>Проверить артикул</h2>
             <p className="small-note">Введите артикул, чтобы проверить его соответствие одной из найденных масок.</p>
-            <input type="text" value={article} onChange={(e) => setArticle(e.target.value)} placeholder="Например, 4VB12A9" aria-label="Артикул для проверки" />
-            {articlePresent && <p role="status" className={`feedback ${matchesArticle(article) ? "feedback-success" : "feedback-error"}`}>
-              {matchesArticle(article) ? "Соответствует маске сертификата." : "Не соответствует маскам сертификата или формату артикула."}
+            <input type="text" value={article} onChange={(e) => { setArticle(e.target.value); setCheckResult(null); setCheckError(""); }} placeholder="Например, 4VB12A9" aria-label="Артикул для проверки" />
+            <button type="button" className="secondary-button" disabled={!article.trim() || checkBusy} onClick={() => void checkArticle()}>{checkBusy ? "Проверяем…" : "Проверить артикул"}</button>
+            {checkResult !== null && <p role="status" className={`feedback ${checkResult ? "feedback-success" : "feedback-error"}`}>
+              {checkResult ? "Соответствует маске сертификата." : "Не соответствует маскам сертификата или формату артикула."}
             </p>}
+            {checkError && <p role="alert" className="feedback feedback-error">{checkError}</p>
           </div>
         </section>}
       </>}
