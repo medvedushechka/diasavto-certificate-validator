@@ -7,7 +7,7 @@ client = TestClient(app)
 
 def test_upload_requires_authentication() -> None:
     response = client.post(
-        "/api/validate",
-        files={"file": ("items.csv", b"article,manufacturer,product_group", "text/csv")},
+        "/api/generation/plan",
+        files={"certificate": ("rules.txt", b"4VB****", "text/plain")},
     )
     assert response.status_code == 401
