@@ -23,6 +23,7 @@ if errorlevel 1 goto failed
 call npm run build
 if errorlevel 1 goto failed
 cd /d "%~dp0"
+set "PYTHONPATH=%~dp0backend;%~dp0backend\src"
 ".venv\Scripts\python.exe" -m pytest backend/tests -q
 if errorlevel 1 goto failed
 echo.
