@@ -1,6 +1,8 @@
 from io import BytesIO
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+
+from auth import require_user
 from fastapi.responses import StreamingResponse
 
 from diasavto_validator.catalog_io import (
@@ -20,7 +22,9 @@ def health() -> dict[str, str]:
 
 
 @app.post("/api/validate", response_class=StreamingResponse)
-async def validate(file: UploadFile = File(...)) -> StreamingResponse:
+async def validate(
+    file: UploadFile = File(...), user_id: str = Depends(require_user)
+) -> StreamingResponse:
     if not file.filename:
         raise HTTPException(status_code=400, detail="Не указано имя файла")
     if file.content_type not in (
