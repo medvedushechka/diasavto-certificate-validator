@@ -39,6 +39,7 @@ def test_unknown_supplier_is_rejected() -> None:
 
 def test_api_checks_supplier_rules() -> None:
     from fastapi.testclient import TestClient
+
     from app import app
     from auth import require_user
 
