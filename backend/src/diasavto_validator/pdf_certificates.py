@@ -1,23 +1,21 @@
 """Чтение текстового слоя PDF без OCR."""
 
 import io
-import re
 
 from pypdf import PdfReader
 
-from .hi_lex import PREFIX_SET
+from .mask_report import MaskReport, classify_masks
 
 MAX_PDF_BYTES = 2 * 1024 * 1024
 MAX_PAGES = 30
 MAX_EXTRACTED_CHARACTERS = 100_000
-MASK_PATTERN = re.compile(r"(?<![A-Za-z0-9*])([A-Z0-9]{3})\*{4}(?![A-Za-z0-9*])")
 
 
 class PdfCertificateError(ValueError):
     pass
 
 
-def extract_pdf_masks(payload: bytes) -> tuple[str, ...]:
+def analyze_pdf_certificate(payload: bytes) -> MaskReport:
     if not payload or len(payload) > MAX_PDF_BYTES:
         raise PdfCertificateError("PDF пустой или превышает 2 МБ")
     if not payload.startswith(b"%PDF-"):
@@ -44,12 +42,16 @@ def extract_pdf_masks(payload: bytes) -> tuple[str, ...]:
     text = "\n".join(text_chunks)
     if not text.strip():
         raise PdfCertificateError("Нет текстового слоя. OCR не входит в задание")
-    found = {match.group(1) for match in MASK_PATTERN.finditer(text)}
-    if not found:
+    return classify_masks(text)
+
+
+def extract_pdf_masks(payload: bytes) -> tuple[str, ...]:
+    """Строгий режим для совместимости с существующими тестами."""
+    report = analyze_pdf_certificate(payload)
+    if not report.approved and not report.unapproved:
         raise PdfCertificateError("В PDF не найдены маски HI-LEX")
-    unknown = found - PREFIX_SET
-    if unknown:
+    if report.unapproved:
         raise PdfCertificateError(
-            "Неутверждённые маски: " + ", ".join(sorted(unknown))
+            "Неутверждённые маски: " + ", ".join(report.unapproved)
         )
-    return tuple(prefix + "****" for prefix in sorted(found))
+    return report.approved
