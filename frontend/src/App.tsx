@@ -133,19 +133,19 @@ export default function App() {
   }
 
   async function checkArticle() {
-    if (!plan || !session || !article.trim() || checkBusy) return;
+    if (!plan || !session || !file || !article.trim() || checkBusy) return;
     setCheckBusy(true);
     setCheckError("");
     setCheckResult(null);
     try {
+      const body = new FormData();
+      body.append("article", article);
+      body.append("certificate", file);
       const response = await fetch("/api/rules/check", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
         cache: "no-store",
-        body: JSON.stringify({ supplier: "hi-lex", article, masks: plan.masks }),
+        body,
       });
       if (!response.ok) throw new Error("Не удалось проверить артикул.");
       const payload: { matches: boolean } = await response.json();
