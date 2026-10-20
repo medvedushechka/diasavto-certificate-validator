@@ -111,6 +111,20 @@ async def validate(
     )
 
 
+@app.get("/api/rules/hi-lex")
+def approved_hi_lex_masks(user_id: str = Depends(require_user)) -> JSONResponse:
+    rules = supplier_rules("hi-lex")
+    return JSONResponse(
+        {
+            "supplier": rules.code,
+            "version": rules.version,
+            "masks": sorted(rules.masks),
+            "count": len(rules.masks),
+        },
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
 @app.post("/api/generation/plan")
 async def generation_plan(
     certificate: UploadFile = File(...),
