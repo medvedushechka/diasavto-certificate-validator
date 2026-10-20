@@ -4,13 +4,14 @@ from fastapi.responses import JSONResponse
 from diasavto_validator.certificates import (
     MAX_CERTIFICATE_BYTES,
     CertificateFormatError,
-    extract_masks,
+    analyze_certificate,
 )
 from diasavto_validator.pdf_certificates import (
     MAX_PDF_BYTES,
     PdfCertificateError,
-    extract_pdf_masks,
+    analyze_pdf_certificate,
 )
+from diasavto_validator.mask_report import MaskReport
 from diasavto_validator.rule_registry import supplier_rules
 
 app = FastAPI(title="DiasAvto Certificate Validator", docs_url=None, redoc_url=None)
@@ -35,7 +36,7 @@ def approved_hi_lex_masks() -> JSONResponse:
     )
 
 
-async def _certificate_masks(certificate: UploadFile) -> tuple[str, ...]:
+async def _certificate_masks(certificate: UploadFile) -> MaskReport:
     if not certificate.filename:
         raise HTTPException(status_code=400, detail="Не указано имя сертификата")
     suffix = certificate.filename.lower().rsplit(".", 1)[-1]
@@ -44,8 +45,8 @@ async def _certificate_masks(certificate: UploadFile) -> tuple[str, ...]:
     await certificate.close()
     try:
         if suffix == "pdf":
-            return extract_pdf_masks(payload)
-        return extract_masks(payload, certificate.filename)
+            return analyze_pdf_certificate(payload)
+        return analyze_certificate(payload, certificate.filename)
     except (PdfCertificateError, CertificateFormatError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -55,9 +56,14 @@ async def generation_plan(
     certificate: UploadFile = File(...),
 ) -> JSONResponse:
     """Извлечь разрешённые маски сертификата без генерации артикулов."""
-    masks = await _certificate_masks(certificate)
+    report = await _certificate_masks(certificate)
     return JSONResponse(
-        {"masks": masks, "mask_count": len(masks)},
+        {
+            "masks": report.approved,
+            "mask_count": report.approved_count,
+            "unapproved_masks": report.unapproved,
+            "unapproved_count": report.unapproved_count,
+        },
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
 
@@ -68,9 +74,14 @@ async def check_article(
     certificate: UploadFile = File(...),
 ) -> JSONResponse:
     # Маски определяются сервером из сертификата, а не передаются клиентом.
-    masks = await _certificate_masks(certificate)
+    report = await _certificate_masks(certificate)
+    if not report.approved:
+        raise HTTPException(
+            status_code=422,
+            detail="В сертификате нет ни одной утверждённой маски HI-LEX",
+        )
     rules = supplier_rules("hi-lex")
-    matched = rules.matches(article, masks)
+    matched = rules.matches(article, report.approved)
     return JSONResponse(
         {"matches": matched, "supplier": rules.code, "rules_version": rules.version},
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
