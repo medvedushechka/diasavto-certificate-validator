@@ -29,6 +29,7 @@
 ## Проверка разработчиком
 
 ```bat
+set PYTHONPATH=backend;backend\src
 .venv\Scripts\python.exe -m pytest backend/tests -q
 cd frontend
 npm run build
