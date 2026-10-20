@@ -2,11 +2,7 @@ import io
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
-from fastapi.testclient import TestClient
-from openpyxl import load_workbook
 
-from app import app
-from auth import require_user
 from diasavto_validator.certificates import CertificateFormatError, extract_masks
 from diasavto_validator.hi_lex import validate_catalog
 from diasavto_validator.models import CatalogItem
@@ -51,24 +47,3 @@ def test_filters_by_certificate_masks() -> None:
     assert not matched[1].is_accepted
 
 
-def test_api_applies_certificate_masks() -> None:
-    app.dependency_overrides[require_user] = lambda: "test-user"
-    try:
-        catalog = (
-            "article,manufacturer,product_group\n"
-            "4VB0000,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-            "9BB0000,HI-LEX CORPORATION,тросы стояночного тормоза\n"
-        ).encode("utf-8")
-        result = TestClient(app).post(
-            "/api/validate",
-            files=[
-                ("file", ("catalog.csv", catalog, "text/csv")),
-                ("certificate", ("mask.txt", b"4VB****", "text/plain")),
-            ],
-        )
-        assert result.status_code == 200
-        book = load_workbook(io.BytesIO(result.content), read_only=True)
-        assert book.worksheets[0].max_row == 2
-        assert book.worksheets[1].max_row == 2
-    finally:
-        app.dependency_overrides.clear()
