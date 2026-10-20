@@ -71,7 +71,12 @@ def test_certificate_recognition_deduplicates_and_sorts() -> None:
         files={"certificate": ("rules.txt", b"9BB**** 4VB**** 9BB****", "text/plain")},
     )
     assert response.status_code == 200
-    assert response.json() == {"masks": ["4VB****", "9BB****"], "mask_count": 2}
+    assert response.json() == {
+        "masks": ["4VB****", "9BB****"],
+        "mask_count": 2,
+        "unapproved_masks": [],
+        "unapproved_count": 0,
+    }
 
 
 def test_approved_masks_endpoint_uses_registry() -> None:
@@ -85,3 +90,73 @@ def test_approved_masks_endpoint_uses_registry() -> None:
     assert data["count"] == len(HI_LEX.masks) == 38
     assert data["masks"] == sorted(HI_LEX.masks)
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_mixed_approved_and_unapproved_masks() -> None:
+    from fastapi.testclient import TestClient
+
+    from app import app
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/generation/plan",
+        files={
+            "certificate": (
+                "rules.txt",
+                b"4VB**** 4QB**** 9BB**** 4QB**** 4VB****",
+                "text/plain",
+            )
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "masks": ["4VB****", "9BB****"],
+        "mask_count": 2,
+        "unapproved_masks": ["4QB****"],
+        "unapproved_count": 1,
+    }
+    check = client.post(
+        "/api/rules/check",
+        data={"article": "4VB12A9"},
+        files={"certificate": ("rules.txt", b"4VB**** 4QB****", "text/plain")},
+    )
+    assert check.status_code == 200
+    assert check.json()["matches"] is True
+
+
+def test_zero_approved_masks_is_reported() -> None:
+    from fastapi.testclient import TestClient
+
+    from app import app
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/generation/plan",
+        files={"certificate": ("rules.txt", b"4QB****", "text/plain")},
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "masks": [],
+        "mask_count": 0,
+        "unapproved_masks": ["4QB****"],
+        "unapproved_count": 1,
+    }
+
+
+def test_no_mask_candidates_is_not_misreported_as_unknown_masks() -> None:
+    from fastapi.testclient import TestClient
+
+    from app import app
+
+    response = TestClient(app).post(
+        "/api/generation/plan",
+        files={"certificate": ("rules.txt", b"no certificate masks here", "text/plain")},
+    )
+    assert response.status_code == 200
+    assert response.json()["mask_count"] == 0
+    assert response.json()["unapproved_count"] == 0
+
+
+def test_registry_contains_exactly_38_unique_masks() -> None:
+    assert len(HI_LEX.masks) == len(set(HI_LEX.masks)) == 38
+    assert all(len(mask) == 7 and mask.endswith("****") for mask in HI_LEX.masks)
