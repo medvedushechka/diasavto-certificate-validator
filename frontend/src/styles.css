@@ -100,3 +100,12 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .mask-sort-note{font-size:12px;color:#788994;margin:18px 0 -5px}
 .mask-list{display:flex;flex-wrap:wrap;gap:9px}
 .mask-list code{display:inline-block;font-variant-numeric:tabular-nums;letter-spacing:.4px;white-space:nowrap}
+
+.allowed-masks-wrap{position:relative}
+.rule-number-button{width:100%;border:0;background:transparent;padding-left:0;padding-right:0;text-align:left;color:inherit;cursor:pointer}
+.rule-number-button:focus-visible{outline:2px solid #d64141;outline-offset:3px;border-radius:6px}
+.rule-number-button small{font-size:11px;color:#b04b4b;font-weight:600}
+.allowed-masks-popover{position:absolute;top:calc(100% - 10px);left:0;z-index:20;width:min(440px,calc(100vw - 54px));max-height:320px;overflow-y:auto;background:#fff;border:1px solid #dce5e9;border-radius:12px;box-shadow:0 14px 38px rgba(20,35,45,.15);padding:16px}
+.allowed-masks-popover>strong{display:block;font-size:13px;margin-bottom:12px}
+.allowed-masks-items{display:flex;flex-wrap:wrap;gap:7px}
+.allowed-masks-items code{font-size:12px;padding:6px 8px;border-radius:5px;background:#f3f6f8;color:#34444e;white-space:nowrap}
