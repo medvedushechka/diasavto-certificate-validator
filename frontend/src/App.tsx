@@ -33,6 +33,9 @@ export default function App() {
   const [error, setError] = useState("");
   const [plan, setPlan] = useState<Plan | null>(null);
   const [article, setArticle] = useState("");
+  const [checkResult, setCheckResult] = useState<boolean | null>(null);
+  const [checkBusy, setCheckBusy] = useState(false);
+  const [checkError, setCheckError] = useState("");
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -58,6 +61,8 @@ export default function App() {
     setFile(issue ? null : candidate);
     setPlan(null);
     setArticle("");
+    setCheckResult(null);
+    setCheckError("");
     setError(issue ?? "");
   }
   function onInputChange(event: ChangeEvent<HTMLInputElement>) {
@@ -99,13 +104,30 @@ export default function App() {
     } finally { setBusy(false); }
   }
 
-  function matchesArticle(value: string): boolean {
-    if (!plan) return false;
-    const normalized = value.replace(/\u00a0/g, " ").trim().replace(/[a-z]/g, (x) => x.toUpperCase());
-    return plan.masks.some((mask) => {
-      if (!/^[A-Z0-9]{3}\*{4}$/.test(mask) || normalized.length !== 7) return false;
-      return normalized.startsWith(mask.slice(0, 3)) && /^[A-Z0-9]{4}$/.test(normalized.slice(3));
-    });
+  async function checkArticle() {
+    if (!plan || !session || !article.trim() || checkBusy) return;
+    setCheckBusy(true);
+    setCheckError("");
+    setCheckResult(null);
+    try {
+      const response = await fetch("/api/rules/check", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: "no-store",
+        body: JSON.stringify({ supplier: "hi-lex", article, masks: plan.masks }),
+      });
+      if (!response.ok) throw new Error("Не удалось проверить артикул.");
+      const payload: { matches: boolean } = await response.json();
+      if (typeof payload.matches !== "boolean") throw new Error("Некорректный ответ сервера.");
+      setCheckResult(payload.matches);
+    } catch (cause) {
+      setCheckError(cause instanceof Error ? cause.message : "Ошибка соединения.");
+    } finally {
+      setCheckBusy(false);
+    }
   }
 
   function downloadMasks() {
@@ -118,8 +140,6 @@ export default function App() {
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 
-  const normalizedArticle = article.replace(/\u00a0/g, " ").trim();
-  const articlePresent = normalizedArticle.length > 0;
   return <div className="page">
     <header className="topbar">
       <div className="brand"><span className="brand-mark">Д+</span>
