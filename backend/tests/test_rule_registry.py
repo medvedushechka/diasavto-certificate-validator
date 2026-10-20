@@ -35,3 +35,32 @@ def test_duplicate_masks_are_rejected() -> None:
 def test_unknown_supplier_is_rejected() -> None:
     with pytest.raises(ValueError):
         supplier_rules("unknown")
+
+
+def test_api_checks_supplier_rules() -> None:
+    from fastapi.testclient import TestClient
+    from app import app
+    from auth import require_user
+
+    app.dependency_overrides[require_user] = lambda: "test-user"
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/rules/check",
+            json={"supplier": "hi-lex", "article": "4VB12A9", "masks": ["4VB****"]},
+        )
+        assert response.status_code == 200
+        assert response.json()["matches"] is True
+        response = client.post(
+            "/api/rules/check",
+            json={"supplier": "hi-lex", "article": "9BB1234", "masks": ["4VB****"]},
+        )
+        assert response.status_code == 200
+        assert response.json()["matches"] is False
+        response = client.post(
+            "/api/rules/check",
+            json={"supplier": "hi-lex", "article": "4VB1234", "masks": ["4QB****"]},
+        )
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
