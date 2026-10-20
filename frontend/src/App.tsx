@@ -2,44 +2,15 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type For
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./auth";
 
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
-const ACCEPTED_EXTENSIONS = [".csv", ".xlsx"];
+type Plan = { masks: string[]; mask_count: number; article_count: number };
+const maxSize = 2 * 1024 * 1024;
 
-type RequestState = "idle" | "loading" | "success" | "error";
-type ExceptionRow = {
-  article: string;
-  manufacturer: string;
-  product_group: string;
-  search_key: string;
-  reason: string;
-};
-type Preview = { total: number; accepted: number; rejected: number; exceptions: ExceptionRow[] };
-const REASONS: Record<string, string> = {
-  invalid_article: "Неверный формат артикула",
-  mask_mismatch: "Не соответствует маскам сертификата",
-  manufacturer_mismatch: "Другой производитель",
-  product_group_mismatch: "Другая товарная группа",
-};
-
-
-function validateFile(file: File): string | null {
-  const extension = "." + (file.name.split(".").pop()?.toLowerCase() ?? "");
-  if (!ACCEPTED_EXTENSIONS.includes(extension)) {
-    return "Поддерживаются только каталоги CSV и XLSX.";
-  }
-  if (file.size === 0 || file.size > MAX_FILE_BYTES) {
-    return "Размер файла должен быть больше 0 и не превышать 2 МБ.";
-  }
+function validateCertificate(file: File): string | null {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (!extension || !["pdf", "docx", "txt"].includes(extension)) return "Поддерживаются PDF, DOCX и TXT.";
+  const limit = extension === "pdf" ? maxSize : 1024 * 1024;
+  if (file.size === 0 || file.size > limit) return "Файл пустой или превышает допустимый размер.";
   return null;
-}
-
-function FileIcon() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true">
-      <path d="M7 3.75h10l6 6V25a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5.75a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M17 3.75v6h6M10 16h10M10 20h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 export default function App() {
@@ -47,12 +18,21 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [article, setArticle] = useState("");
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+      setSession(next);
+      if (!next) { setFile(null); setPlan(null); setArticle(""); }
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -60,270 +40,148 @@ export default function App() {
     event.preventDefault();
     setAuthBusy(true);
     setAuthError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError("Не удалось войти. Проверьте учётные данные.");
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) setAuthError("Не удалось войти. Проверьте учётные данные.");
     setAuthBusy(false);
-  }
-  const [file, setFile] = useState<File | null>(null);
-  const [certificate, setCertificate] = useState<File | null>(null);
-  const certificateInputRef = useRef<HTMLInputElement>(null);
-  const [state, setState] = useState<RequestState>("idle");
-  const [message, setMessage] = useState("");
-  const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [filter, setFilter] = useState("all");
-  const [query, setQuery] = useState("");
-  const filtered = preview?.exceptions.filter((entry) => {
-    const matchesReason = filter === "all" || entry.reason === filter;
-    const term = query.trim().toLocaleLowerCase();
-    return matchesReason && (!term || [entry.article, entry.manufacturer, entry.product_group, entry.search_key]
-      .some((value) => value.toLocaleLowerCase().includes(term)));
-  }) ?? [];
-  function resetResults() {
-    setPreview(null);
-    setQuery("");
-    setFilter("all");
   }
 
   function chooseFile(candidate?: File) {
     if (!candidate) return;
-    const error = validateFile(candidate);
-    setFile(error ? null : candidate);
-    resetResults();
-    setState(error ? "error" : "idle");
-    setMessage(error ?? "");
+    const issue = validateCertificate(candidate);
+    setFile(issue ? null : candidate);
+    setPlan(null);
+    setArticle("");
+    setError(issue ?? "");
   }
-
   function onInputChange(event: ChangeEvent<HTMLInputElement>) {
     chooseFile(event.target.files?.[0]);
     event.target.value = "";
   }
-
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragging(false);
     chooseFile(event.dataTransfer.files[0]);
   }
 
-  async function submit() {
-    if (!file || state === "loading" || !session) return;
-    setState("loading");
-    setMessage("");
-    resetResults();
-    const form = new FormData();
-    form.append("file", file);
-    if (certificate) form.append("certificate", certificate);
+  async function recognize() {
+    if (!session || !file || busy) return;
+    setBusy(true); setError(""); setPlan(null);
+    const body = new FormData();
+    body.append("certificate", file);
     try {
-      const previewResponse = await fetch("/api/preview", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body: form,
-        cache: "no-store",
-      });
-      if (!previewResponse.ok) {
-        let detail = "Не удалось проверить каталог.";
-        try {
-          const body: unknown = await previewResponse.json();
-          if (typeof body === "object" && body !== null && "detail" in body && typeof body.detail === "string") detail = body.detail;
-        } catch {
-          // Сервер может вернуть ошибку не в формате JSON.
-        }
-        throw new Error(detail);
-      }
-      const summary: Preview = await previewResponse.json();
-      if (!Array.isArray(summary.exceptions) || summary.rejected !== summary.exceptions.length) {
-        throw new Error("Сервер вернул некорректные результаты.");
-      }
-      setPreview(summary);
-      const response = await fetch("/api/validate", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body: form,
-        cache: "no-store",
+      const response = await fetch("/api/generation/plan", {
+        method: "POST", headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: "no-store", body,
       });
       if (!response.ok) {
-        let detail = "Не удалось обработать каталог.";
+        let message = "Не удалось распознать сертификат.";
         try {
-          const error: unknown = await response.json();
-          if (
-            typeof error === "object" &&
-            error !== null &&
-            "detail" in error &&
-            typeof error.detail === "string"
-          ) {
-            detail = error.detail;
+          const payload: unknown = await response.json();
+          if (typeof payload === "object" && payload !== null && "detail" in payload && typeof payload.detail === "string") {
+            message = payload.detail;
           }
-        } catch {
-          // Сервер может вернуть ответ не в формате JSON.
-        }
-        throw new Error(detail);
+        } catch { /* Ответ сервера может быть не JSON. */ }
+        throw new Error(message);
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "validation-report.xlsx";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setState("success");
-      setMessage("Проверка завершена. Итоги доступны ниже, Excel-отчёт скачан.");
-    } catch (error) {
-      setState("error");
-      setMessage(error instanceof Error ? error.message : "Ошибка соединения с сервером.");
-    }
+      const result: Plan = await response.json();
+      if (!Array.isArray(result.masks) || result.mask_count !== result.masks.length ||
+        result.masks.some((mask) => typeof mask !== "string")) throw new Error("Некорректный ответ сервера.");
+      setPlan(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Ошибка соединения.");
+    } finally { setBusy(false); }
   }
 
-  return (
-    <div className="page">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">Д+</span>
-          <span className="brand-name">ДиасАвто<span>+</span></span>
-          <span className="brand-divider" />
-          <span className="brand-product">Проверка сертификатов</span>
-        </div>
-        <span className="environment">Тестовая версия</span>
-      </header>
+  function matchesArticle(value: string): boolean {
+    if (!plan) return false;
+    const normalized = value.replace(/\u00a0/g, " ").trim().replace(/[a-z]/g, (x) => x.toUpperCase());
+    return plan.masks.some((mask) => {
+      if (!/^[A-Z0-9]{3}\*{4}$/.test(mask) || normalized.length !== 7) return false;
+      return normalized.startsWith(mask.slice(0, 3)) && /^[A-Z0-9]{4}$/.test(normalized.slice(3));
+    });
+  }
 
-      <main className="main">
-        <div className="eyebrow"><span className="eyebrow-dot" /> ИНСТРУМЕНТ ПРОВЕРКИ</div>
-        <h1>Проверка артикулов<br />по маскам сертификатов</h1>
-        <p className="intro">Загрузите каталог производителя. Система проверит артикулы по утверждённым маскам HI-LEX и сформирует Excel-отчёт.</p>
+  function downloadMasks() {
+    if (!plan) return;
+    const csv = ["mask", ...plan.masks].join("\r\n") + "\r\n";
+    const objectUrl = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl; anchor.download = "certificate-masks.csv";
+    document.body.appendChild(anchor); anchor.click(); anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
 
-        {!session ? (
-          <form className="login-panel" onSubmit={signIn}>
-            <h2>Вход в систему</h2>
-            <p>Для проверки файлов необходима учётная запись.</p>
-            <input aria-label="Электронная почта" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Электронная почта" />
-            <input aria-label="Пароль" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль" />
-            <button className="primary-button" type="submit" disabled={authBusy}>{authBusy ? "Проверка…" : "Войти"}</button>
-            {authError && <p className="feedback feedback-error" role="alert">{authError}</p>}
-          </form>
-        ) : <><div className="session-bar"><span>Вы вошли в систему</span><button type="button" onClick={() => void supabase.auth.signOut()}>Выйти</button></div>
+  const normalizedArticle = article.replace(/\u00a0/g, " ").trim();
+  const articlePresent = normalizedArticle.length > 0;
+  return <div className="page">
+    <header className="topbar">
+      <div className="brand"><span className="brand-mark">Д+</span>
+        <span className="brand-name">ДиасАвто<span>+</span></span>
+        <span className="brand-divider" /><span className="brand-product">Проверка сертификатов</span>
+      </div><span className="environment">Тестовая версия</span>
+    </header>
+    <main className="main">
+      <div className="eyebrow"><span className="eyebrow-dot" /> ИНСТРУМЕНТ ПРОВЕРКИ</div>
+      <h1>Проверка артикулов<br />по маскам сертификата</h1>
+      <p className="intro">Загрузите сертификат. Система распознает маски HI-LEX и позволит проверить, покрывается ли конкретный артикул сертификатом. Каталог товаров не требуется.</p>
+      {!session ? <form className="login-panel" onSubmit={signIn}>
+        <h2>Вход в систему</h2><p>Для работы необходима учётная запись.</p>
+        <input aria-label="Электронная почта" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Электронная почта" />
+        <input aria-label="Пароль" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль" />
+        <button className="primary-button" type="submit" disabled={authBusy}>{authBusy ? "Входим…" : "Войти"}</button>
+        {authError && <p className="feedback feedback-error" role="alert">{authError}</p>}
+      </form> : <>
+        <div className="session-bar"><span>Вы вошли в систему</span><button type="button" onClick={() => void supabase.auth.signOut()}>Выйти</button></div>
         <div className="workspace">
           <section className="panel" aria-labelledby="upload-heading">
-            <div className="panel-heading">
-              <div>
-                <span className="step">01 / ЗАГРУЗКА</span>
-                <h2 id="upload-heading">Каталог товаров</h2>
-              </div>
-              <span className="tag">CSV, XLSX</span>
+            <div className="panel-heading"><div><span className="step">01 / СЕРТИФИКАТ</span>
+              <h2 id="upload-heading">Загрузка сертификата</h2></div><span className="tag">PDF, DOCX, TXT</span>
             </div>
-            <div className="certificate-upload">
-              <strong>Сертификат с масками</strong>
-              <p>Необязательно. DOCX или TXT, максимум 1 МБ. Без сертификата используются все 38 утверждённых масок.</p>
-              <input ref={certificateInputRef} className="sr-only" type="file" accept=".docx,.txt" aria-label="Выбрать сертификат" onChange={(event) => {
-                const selected = event.target.files?.[0];
-                event.target.value = "";
-                if (!selected) return;
-                const ext = selected.name.split(".").pop()?.toLowerCase();
-                if (!["docx", "txt"].includes(ext || "") || selected.size === 0 || selected.size > 1024 * 1024) {
-                  setCertificate(null);
-                  setState("error");
-                  setMessage("Сертификат должен быть DOCX/TXT размером до 1 МБ.");
-                  return;
-                }
-                setCertificate(selected);
-                resetResults();
-                setState("idle");
-                setMessage("");
-              }} />
-              <button type="button" className="secondary-button" onClick={() => certificateInputRef.current?.click()}>
-                {certificate ? certificate.name : "Выбрать сертификат"}
-              </button>
-              {certificate && <button type="button" className="secondary-button" onClick={() => { setCertificate(null); resetResults(); setState("idle"); }}>Убрать</button>}
-            </div>
-            <div
-              className={`dropzone${dragging ? " dragging" : ""}`}
+            <div className={`dropzone${dragging ? " dragging" : ""}`}
               onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-            >
-              <div className="file-icon"><FileIcon /></div>
-              <strong>{file ? file.name : "Перетащите файл сюда"}</strong>
-              <p>{file ? `${(file.size / 1024).toFixed(1)} КБ · готов к проверке` : "или выберите файл на компьютере"}</p>
-              <button className="secondary-button" type="button" onClick={() => inputRef.current?.click()}>
-                {file ? "Заменить файл" : "Выбрать файл"}
-              </button>
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".csv,.xlsx"
-                className="sr-only"
-                aria-label="Выбрать каталог товаров"
-                onChange={onInputChange}
-              />
+              onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+              <div className="file-icon"><span aria-hidden="true" className="upload-glyph">⇧</span></div>
+              <strong>{file ? file.name : "Перетащите сертификат сюда"}</strong>
+              <p>{file ? `${(file.size / 1024).toFixed(1)} КБ · готов к распознаванию` : "или выберите файл на компьютере"}</p>
+              <button type="button" className="secondary-button" onClick={() => inputRef.current?.click()}>{file ? "Заменить файл" : "Выбрать файл"}</button>
+              <input ref={inputRef} type="file" accept=".pdf,.docx,.txt" className="sr-only" aria-label="Выбрать сертификат" onChange={onInputChange} />
             </div>
-            <div className="limit">
-              <span>Максимальный размер — 2 МБ</span>
-              <span>До 10 000 строк</span>
-            </div>
-            <button className="primary-button" type="button" onClick={submit} disabled={!file || state === "loading"}>
-              {state === "loading" ? "Проверяем каталог…" : "Проверить каталог"}
-              <span aria-hidden="true">↗</span>
+            <div className="limit"><span>PDF до 2 МБ, DOCX/TXT до 1 МБ</span><span>PDF до 30 страниц</span></div>
+            <button type="button" className="primary-button" disabled={!file || busy} onClick={() => void recognize()}>
+              {busy ? "Распознаём…" : "Распознать маски"}<span aria-hidden="true">↗</span>
             </button>
-            {message && (
-              <p className={`feedback ${state === "error" ? "feedback-error" : "feedback-success"}`} role="status">
-                {message}
-              </p>
-            )}
+            {error && <p className="feedback feedback-error" role="alert">{error}</p>}
           </section>
-
           <aside className="details">
-            <section className="detail-card">
-              <span className="step">02 / ПРАВИЛА ПРОВЕРКИ</span>
-              <h2>HI-LEX CORPORATION</h2>
+            <section className="detail-card"><span className="step">02 / ПРАВИЛА</span><h2>HI-LEX CORPORATION</h2>
               <p>Тросы стояночного тормоза</p>
               <div className="rule-number"><strong>38</strong><span>утверждённых<br />масок</span></div>
-              <div className="rule-example"><span>ПРИМЕР МАСКИ</span><code>4VB****</code></div>
-              <p className="small-note">Каждая звёздочка — одна цифра 0–9 или латинская буква A–Z. Артикул содержит ровно 7 символов.</p>
-            </section>
-            <section className="detail-card format-card">
-              <span className="step">ФОРМАТ КАТАЛОГА</span>
-              <p>Первая строка файла должна содержать три столбца:</p>
-              <div className="fields"><code>article</code><code>manufacturer</code><code>product_group</code></div>
-              <p className="small-note">Результат: два листа Excel — подходящие позиции и исключения с причинами.</p>
+              <div className="rule-example"><span>ПРИМЕР</span><code>4VB****</code></div>
+              <p className="small-note">После фиксированного префикса — четыре символа из A–Z и 0–9. OCR для PDF-сканов не требуется по ТЗ.</p>
             </section>
           </aside>
         </div>
-        {preview && (
-          <section className="results-panel" aria-label="Результаты проверки">
-            <h2>Результаты проверки</h2>
-            <div className="result-stats">
-              <div><span>Всего проверено</span><strong>{preview.total}</strong></div>
-              <div><span>Подходят</span><strong>{preview.accepted}</strong></div>
-              <div><span>Исключения</span><strong>{preview.rejected}</strong></div>
-            </div>
-            <div className="results-toolbar">
-              <label>Причина исключения
-                <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-                  <option value="all">Все причины</option>
-                  {Object.entries(REASONS).map(([code, title]) => <option key={code} value={code}>{title}</option>)}
-                </select>
-              </label>
-              <label>Поиск по исключениям
-                <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Артикул, производитель..." />
-              </label>
-            </div>
-            <p className="results-count">Найдено исключений: {filtered.length} из {preview.rejected}</p>
-            <div className="results-table-wrap">
-              <table className="results-table">
-                <thead><tr><th>Артикул</th><th>Производитель</th><th>Товарная группа</th><th>Причина</th></tr></thead>
-                <tbody>
-                  {filtered.map((entry, i) => (
-                    <tr key={i}><td>{entry.article}</td><td>{entry.manufacturer}</td><td>{entry.product_group}</td><td>{REASONS[entry.reason] ?? entry.reason}</td></tr>
-                  ))}
-                  {filtered.length === 0 && <tr><td colSpan={4}>Исключений по выбранным условиям нет.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-        </>}
-        <footer className="footer">Проверка формата не подтверждает наличие артикула в каталоге производителя.</footer>
-      </main>
-    </div>
-  );
+        {plan && <section className="results-panel" aria-label="Результаты распознавания">
+          <span className="step">03 / РЕЗУЛЬТАТ</span><h2>Маски сертификата</h2>
+          <div className="result-stats">
+            <div><span>Найдено масок</span><strong>{plan.mask_count}</strong></div>
+            <div><span>Производитель</span><strong className="result-brand">HI-LEX</strong></div>
+            <div><span>Режим</span><strong className="result-brand">Правила</strong></div>
+          </div>
+          <p className="small-note">Это описание множества допустимых артикулов: сами комбинации не генерируются.</p>
+          <div className="mask-list">{plan.masks.map(mask => <code key={mask}>{mask}</code>)}</div>
+          <button type="button" className="secondary-button" onClick={downloadMasks}>Скачать список масок (CSV)</button>
+          <div className="article-check">
+            <h2>Проверить артикул</h2>
+            <p className="small-note">Введите артикул, чтобы проверить его соответствие одной из найденных масок.</p>
+            <input type="text" value={article} onChange={(e) => setArticle(e.target.value)} placeholder="Например, 4VB12A9" aria-label="Артикул для проверки" />
+            {articlePresent && <p role="status" className={`feedback ${matchesArticle(article) ? "feedback-success" : "feedback-error"}`}>
+              {matchesArticle(article) ? "Соответствует маске сертификата." : "Не соответствует маскам сертификата или формату артикула."}
+            </p>}
+          </div>
+        </section>}
+      </>}
+      <footer className="footer">Соответствие маске не подтверждает существование артикула в каталоге производителя.</footer>
+    </main>
+  </div>;
 }
