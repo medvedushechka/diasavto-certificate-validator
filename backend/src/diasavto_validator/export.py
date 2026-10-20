@@ -30,7 +30,8 @@ def export_zip(
         with ZipFile(archive_path, mode="x", compression=ZIP_DEFLATED, allowZip64=True) as archive:
             for rule in rules:
                 iterator = rule.generate()
-                while True:
+                remaining = rule.count
+                while remaining:
                     index += 1
                     name = f"articles-{index:05d}.csv"
                     rows_in_part = 0
@@ -44,8 +45,7 @@ def export_zip(
                                 processed += 1
                                 if rows_in_part >= chunk_rows:
                                     break
-                    if rows_in_part < chunk_rows:
-                        break
+                    remaining -= rows_in_part
             archive.writestr(
                 "manifest.json",
                 json.dumps(
