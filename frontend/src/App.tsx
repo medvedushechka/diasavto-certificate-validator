@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
-type Plan = { masks: string[]; mask_count: number };
+type Plan = { masks: string[]; mask_count: number; unapproved_masks: string[]; unapproved_count: number };
 
 function sortedMasks(masks: string[]): string[] {
   return [...masks].sort((a, b) => {
@@ -15,7 +15,8 @@ function validateCertificate(file: File): string | null {
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (!extension || !["pdf", "docx", "txt"].includes(extension)) return "Поддерживаются PDF, DOCX и TXT.";
   const limit = extension === "pdf" ? maxSize : 1024 * 1024;
-  if (file.size === 0 || file.size > limit) return "Файл пустой или превышает допустимый размер.";
+  if (file.size === 0) return "Файл пустой. Выберите сертификат с текстом.";
+  if (file.size > limit) return `Файл слишком большой. Максимальный размер: ${extension === "pdf" ? "2 МБ" : "1 МБ"}.`;
   return null;
 }
 
@@ -94,8 +95,15 @@ export default function App() {
       }
       const result: Plan = await response.json();
       if (!Array.isArray(result.masks) || result.mask_count !== result.masks.length ||
-        result.masks.some((mask) => typeof mask !== "string")) throw new Error("Некорректный ответ сервера.");
-      setPlan({ ...result, masks: sortedMasks(result.masks) });
+        !Array.isArray(result.unapproved_masks) || result.unapproved_count !== result.unapproved_masks.length ||
+        [...result.masks, ...result.unapproved_masks].some((mask) => typeof mask !== "string")) {
+        throw new Error("Сервер вернул некорректный результат распознавания.");
+      }
+      setPlan({
+        ...result,
+        masks: sortedMasks(result.masks),
+        unapproved_masks: sortedMasks(result.unapproved_masks),
+      });
       setCheckResult(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка соединения.");
@@ -116,7 +124,10 @@ export default function App() {
         cache: "no-store",
         body,
       });
-      if (!response.ok) throw new Error("Не удалось проверить артикул.");
+      if (!response.ok) {
+        const payload: { detail?: string } = await response.json().catch(() => ({}));
+        throw new Error(typeof payload.detail === "string" ? payload.detail : "Не удалось проверить артикул.");
+      }
       const payload: { matches: boolean } = await response.json();
       if (typeof payload.matches !== "boolean") throw new Error("Некорректный ответ сервера.");
       setCheckResult(payload.matches);
@@ -197,24 +208,40 @@ export default function App() {
         {plan && <section className="results-panel" aria-label="Результаты распознавания">
           <h2>Маски сертификата</h2>
           <div className="result-stats">
-            <div><span>Найдено масок</span><strong>{plan.mask_count}</strong></div>
+            <div><span>Утверждённых масок</span><strong>{plan.mask_count}</strong></div>
+            <div><span>Неутверждённых масок</span><strong>{plan.unapproved_count}</strong></div>
             <div><span>Производитель</span><strong className="result-brand">HI-LEX</strong></div>
-            <div><span>Режим</span><strong className="result-brand">Правила</strong></div>
           </div>
-          <p className="small-note">Это описание множества допустимых артикулов: сами комбинации не генерируются.</p>
-          <p className="mask-sort-note">Маски отсортированы по первым трём символам (A–Z, 0–9).</p>
-          <div className="mask-list">{plan.masks.map(mask => <code key={mask}>{mask}</code>)}</div>
-          <button type="button" className="secondary-button" onClick={downloadMasks}>Скачать список масок (CSV)</button>
-          <div className="article-check">
-            <h2>Проверить артикул</h2>
-            <p className="small-note">Введите артикул, чтобы проверить его соответствие одной из найденных масок.</p>
-            <input type="text" value={article} onChange={(e) => { setArticle(e.target.value); setCheckResult(null); setCheckError(""); }} placeholder="Например, 4VB12A9" aria-label="Артикул для проверки" />
-            <button type="button" className="secondary-button" disabled={!article.trim() || checkBusy} onClick={() => void checkArticle()}>{checkBusy ? "Проверяем…" : "Проверить артикул"}</button>
-            {checkResult !== null && <p role="status" className={`feedback ${checkResult ? "feedback-success" : "feedback-error"}`}>
-              {checkResult ? "Соответствует маске сертификата." : "Не соответствует маскам сертификата или формату артикула."}
-            </p>}
-            {checkError && <p role="alert" className="feedback feedback-error">{checkError}</p>}
-          </div>
+          {plan.mask_count === 0 && plan.unapproved_count === 0 ? (
+            <p className="feedback feedback-error" role="status">В документе не обнаружены маски формата ABC****. Проверьте содержимое файла и формат записи.</p>
+          ) : plan.mask_count === 0 ? (
+            <p className="feedback feedback-error" role="status">В сертификате нет ни одной утверждённой маски HI-LEX. Найдено неутверждённых: {plan.unapproved_count}.</p>
+          ) : plan.unapproved_count > 0 ? (
+            <p className="feedback feedback-warning" role="status">Утверждённых масок: {plan.mask_count}. Неутверждённых: {plan.unapproved_count}. Для проверки артикулов используются только утверждённые.</p>
+          ) : (
+            <p className="feedback feedback-success" role="status">Найдено {plan.mask_count} утверждённых масок. Неутверждённых масок нет.</p>
+          )}
+          {plan.unapproved_count > 0 && <div className="unapproved-group">
+            <h3>Неутверждённые маски</h3>
+            <p className="small-note">Эти маски отсутствуют в перечне HI-LEX и не используются для проверки артикулов.</p>
+            <div className="mask-list mask-list-unapproved">{plan.unapproved_masks.map(mask => <code key={mask}>{mask}</code>)}</div>
+          </div>}
+          {plan.mask_count > 0 && <>
+            <h3 className="approved-heading">Утверждённые маски сертификата</h3>
+            <p className="mask-sort-note">Отсортированы по первым трём символам. Повторы удалены.</p>
+            <div className="mask-list">{plan.masks.map(mask => <code key={mask}>{mask}</code>)}</div>
+            <button type="button" className="secondary-button" onClick={downloadMasks}>Скачать список масок (CSV)</button>
+            <div className="article-check">
+              <h2>Проверить артикул</h2>
+              <p className="small-note">Введите артикул, чтобы проверить его соответствие утверждённым маскам этого сертификата.</p>
+              <input type="text" value={article} onChange={(e) => { setArticle(e.target.value); setCheckResult(null); setCheckError(""); }} placeholder="Например, 4VB12A9" aria-label="Артикул для проверки" />
+              <button type="button" className="secondary-button" disabled={!article.trim() || checkBusy} onClick={() => void checkArticle()}>{checkBusy ? "Проверяем…" : "Проверить артикул"}</button>
+              {checkResult !== null && <p role="status" className={`feedback ${checkResult ? "feedback-success" : "feedback-error"}`}>
+                {checkResult ? "Артикул соответствует утверждённой маске сертификата." : "Артикул не соответствует утверждённым маскам сертификата или формату артикула."}
+              </p>}
+              {checkError && <p role="alert" className="feedback feedback-error">{checkError}</p>}
+            </div>
+          </>}
         </section>}
       <footer className="footer">Соответствие маске не подтверждает существование артикула в каталоге производителя.</footer>
     </main>
