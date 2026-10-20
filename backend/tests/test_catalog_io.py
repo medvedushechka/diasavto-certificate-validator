@@ -5,8 +5,10 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
 
 from app import app
+from auth import require_user
 from diasavto_validator.catalog_io import CatalogFormatError, parse_catalog
 
+app.dependency_overrides[require_user] = lambda: "synthetic-user-id"
 client = TestClient(app)
 
 
