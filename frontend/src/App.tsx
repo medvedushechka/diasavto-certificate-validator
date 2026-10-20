@@ -10,6 +10,7 @@ function sortedMasks(masks: string[]): string[] {
     return prefixOrder || a.localeCompare(b, "en");
   });
 }
+const apiBase = import.meta.env.VITE_API_BASE_URL || "";
 const maxSize = 2 * 1024 * 1024;
 
 function validateCertificate(file: File): string | null {
@@ -56,7 +57,7 @@ export default function App() {
       return;
     }
     const controller = new AbortController();
-    void fetch("/api/rules/hi-lex", {
+    void fetch(`${apiBase}/api/rules/hi-lex`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
       signal: controller.signal,
       cache: "no-store",
@@ -108,7 +109,7 @@ export default function App() {
     const body = new FormData();
     body.append("certificate", file);
     try {
-      const response = await fetch("/api/generation/plan", {
+      const response = await fetch(`${apiBase}/api/generation/plan`, {
         method: "POST", headers: { Authorization: `Bearer ${session.access_token}` },
         cache: "no-store", body,
       });
@@ -141,7 +142,7 @@ export default function App() {
       const body = new FormData();
       body.append("article", article);
       body.append("certificate", file);
-      const response = await fetch("/api/rules/check", {
+      const response = await fetch(`${apiBase}/api/rules/check`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
         cache: "no-store",
