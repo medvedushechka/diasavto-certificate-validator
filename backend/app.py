@@ -13,7 +13,6 @@ from diasavto_validator.catalog_io import (
 )
 from diasavto_validator.hi_lex import validate_catalog
 from diasavto_validator.models import ValidationResult
-from diasavto_validator.generator import MaskRule, count_articles
 from diasavto_validator.pdf_certificates import extract_pdf_masks, PdfCertificateError, MAX_PDF_BYTES
 from diasavto_validator.certificates import (
     MAX_CERTIFICATE_BYTES,
@@ -130,8 +129,7 @@ async def generation_plan(
             masks = extract_masks(payload, certificate.filename)
     except (PdfCertificateError, CertificateFormatError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    rules = tuple(MaskRule(mask[:-4]) for mask in masks)
     return JSONResponse(
-        {"masks": masks, "mask_count": len(masks), "article_count": count_articles(rules)},
+        {"masks": masks, "mask_count": len(masks)},
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
