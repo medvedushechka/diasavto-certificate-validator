@@ -66,3 +66,8 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .login-panel input:focus-visible{outline:2px solid #d64141;outline-offset:2px}
 .session-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;color:#64737d;font-size:13px}
 .session-bar button{border:1px solid #dbe3e8;background:#fff;border-radius:8px;padding:8px 14px;color:#34444e}
+
+.certificate-upload{background:#f8fafb;border:1px solid #e5ebef;border-radius:10px;padding:16px;margin-bottom:18px;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.certificate-upload strong{width:100%;font-size:14px}
+.certificate-upload p{width:100%;font-size:12px;line-height:1.6;color:#73818c;margin:0}
+.certificate-upload button{max-width:100%;overflow-wrap:anywhere}
