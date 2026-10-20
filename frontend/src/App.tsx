@@ -2,7 +2,14 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type For
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./auth";
 
-type Plan = { masks: string[]; mask_count: number; article_count: number };
+type Plan = { masks: string[]; mask_count: number };
+
+function sortedMasks(masks: string[]): string[] {
+  return [...masks].sort((a, b) => {
+    const prefixOrder = a.slice(0, 3).localeCompare(b.slice(0, 3), "en");
+    return prefixOrder || a.localeCompare(b, "en");
+  });
+}
 const maxSize = 2 * 1024 * 1024;
 
 function validateCertificate(file: File): string | null {
@@ -86,7 +93,7 @@ export default function App() {
       const result: Plan = await response.json();
       if (!Array.isArray(result.masks) || result.mask_count !== result.masks.length ||
         result.masks.some((mask) => typeof mask !== "string")) throw new Error("Некорректный ответ сервера.");
-      setPlan(result);
+      setPlan({ ...result, masks: sortedMasks(result.masks) });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка соединения.");
     } finally { setBusy(false); }
@@ -169,6 +176,7 @@ export default function App() {
             <div><span>Режим</span><strong className="result-brand">Правила</strong></div>
           </div>
           <p className="small-note">Это описание множества допустимых артикулов: сами комбинации не генерируются.</p>
+          <p className="mask-sort-note">Маски отсортированы по первым трём символам (A–Z, 0–9).</p>
           <div className="mask-list">{plan.masks.map(mask => <code key={mask}>{mask}</code>)}</div>
           <button type="button" className="secondary-button" onClick={downloadMasks}>Скачать список масок (CSV)</button>
           <div className="article-check">
