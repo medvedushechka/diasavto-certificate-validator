@@ -8,8 +8,14 @@ from app import app
 from auth import require_user
 from diasavto_validator.catalog_io import CatalogFormatError, parse_catalog
 
-app.dependency_overrides[require_user] = lambda: "synthetic-user-id"
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_user():
+    app.dependency_overrides[require_user] = lambda: "synthetic-user-id"
+    yield
+    app.dependency_overrides.clear()
 
 
 def test_csv_parses_and_preserves_raw_article() -> None:
