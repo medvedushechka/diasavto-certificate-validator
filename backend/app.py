@@ -13,6 +13,8 @@ from diasavto_validator.catalog_io import (
 )
 from diasavto_validator.hi_lex import validate_catalog
 from diasavto_validator.models import ValidationResult
+from diasavto_validator.generator import MaskRule, count_articles
+from diasavto_validator.pdf_certificates import extract_pdf_masks, PdfCertificateError, MAX_PDF_BYTES
 from diasavto_validator.certificates import (
     MAX_CERTIFICATE_BYTES,
     CertificateFormatError,
@@ -106,4 +108,30 @@ async def validate(
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
         },
+    )
+
+
+@app.post("/api/generation/plan")
+async def generation_plan(
+    certificate: UploadFile = File(...),
+    user_id: str = Depends(require_user),
+) -> JSONResponse:
+    """Предварительный расчёт объёма выгрузки без генерации миллионов строк."""
+    if not certificate.filename:
+        raise HTTPException(status_code=400, detail="Не указано имя сертификата")
+    suffix = certificate.filename.lower().rsplit(".", 1)[-1]
+    limit = MAX_PDF_BYTES if suffix == "pdf" else MAX_CERTIFICATE_BYTES
+    payload = await certificate.read(limit + 1)
+    await certificate.close()
+    try:
+        if suffix == "pdf":
+            masks = extract_pdf_masks(payload)
+        else:
+            masks = extract_masks(payload, certificate.filename)
+    except (PdfCertificateError, CertificateFormatError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    rules = tuple(MaskRule(mask[:-4]) for mask in masks)
+    return JSONResponse(
+        {"masks": masks, "mask_count": len(masks), "article_count": count_articles(rules)},
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
