@@ -96,3 +96,7 @@ h2{font-size:21px;line-height:1.35;letter-spacing:-.7px;margin:10px 0 0}
 .article-check{border-top:1px solid #edf1f3;margin-top:25px;padding-top:24px}
 .article-check input{margin-top:16px;width:100%;max-width:380px;padding:13px 15px;background:#fff;border:1px solid #cbd6dc;border-radius:8px}
 .article-check .feedback{max-width:540px}
+
+.mask-sort-note{font-size:12px;color:#788994;margin:18px 0 -5px}
+.mask-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
+.mask-list code{display:block;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.4px;white-space:nowrap}
